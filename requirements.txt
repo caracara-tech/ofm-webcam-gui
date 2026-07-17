@@ -1,0 +1,15 @@
+# Webcam Viewer Application Dependencies
+# Install with: pip install -r requirements.txt
+
+# Essential dependencies
+PyQt5>=5.15.0
+opencv-python>=4.5.0
+numpy>=1.19.0
+
+# Hardware control
+sangaboard>=0.1.0
+pyserial>=3.5
+
+# Optional: Windows camera name detection
+# Comment if you are using a different operating system from Windows
+pygrabber>=0.1.0
