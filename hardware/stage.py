@@ -1,7 +1,13 @@
+"""
+Concrete implementations of stage controllers.
+"""
+
 import abc
 import time
 import serial
+from typing import Tuple
 from .abstract import StageController
+
 
 class ArduinoStageController(StageController):
     """
@@ -9,8 +15,7 @@ class ArduinoStageController(StageController):
     """
 
     def __init__(self, port='COM12', baudrate=9600, timeout=1):
-        self.port = port
-        self.baudrate = baudrate
+        super().__init__()
         self.port = port
         self.baudrate = baudrate
         self.timeout = timeout
@@ -21,13 +26,12 @@ class ArduinoStageController(StageController):
         self.z = 0
 
         # Initialize Base (Default Calibration)
-        super().__init__()
         # User defaults: 244nm in y, 610nm in x, 305.5nm in z
         self.scale_nm_per_step_x = 610.0
         self.scale_nm_per_step_y = 244.0
         self.scale_nm_per_step_z = 305.5
 
-    def get_position(self):
+    def get_position(self) -> Tuple[int, int, int]:
         return (self.x, self.y, self.z)
 
     def set_position(self, x=0, y=0, z=0, relative_move_to_target=False):
@@ -129,6 +133,7 @@ class ArduinoStageController(StageController):
         self._stop_requested = True
         return True
 
+
 # Try import Sangaboard
 try:
     from sangaboard import Sangaboard
@@ -136,13 +141,13 @@ except ImportError:
     Sangaboard = None
     print("Sangaboard module not found. SangaboardStageController will not be available.")
 
+
 class SangaboardStageController(StageController):
     """
     Implementation of StageController for Sangaboard.
     """
     def __init__(self, port, timeout=2):
-        self.port = port
-        self.timeout = timeout
+        super().__init__()
         self.port = port
         self.timeout = timeout
         self.sb = None
@@ -151,7 +156,6 @@ class SangaboardStageController(StageController):
         self.y = 0
         self.z = 0
 
-        super().__init__()
         # User defaults: Sangaboard step size 12.2nm
         self.scale_nm_per_step_x = 12.2
         self.scale_nm_per_step_y = 12.2
@@ -160,7 +164,7 @@ class SangaboardStageController(StageController):
         # Enforce Sangaboard speed limit
         self.min_step_delay_us = 1000
 
-    def get_position(self):
+    def get_position(self) -> Tuple[int, int, int]:
         return (self.x, self.y, self.z)
 
     def set_position(self, x=0, y=0, z=0, relative_move_to_target=False):
@@ -336,7 +340,7 @@ class MockStageController(StageController):
         
         print("[MockStageController] Initialized (simulation mode)")
 
-    def get_position(self):
+    def get_position(self) -> Tuple[int, int, int]:
         return (self.x, self.y, self.z)
 
     def set_position(self, x=0, y=0, z=0, relative_move_to_target=False):

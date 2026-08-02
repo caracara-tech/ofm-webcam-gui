@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """
 Webcam Snapshot & Recorder — Logitech C270
 =============================================
