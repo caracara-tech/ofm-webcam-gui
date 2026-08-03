@@ -1,182 +1,116 @@
 # OFM Webcam Viewer
 
-A minimal PyQt5 + OpenCV application for streaming webcam feeds and capturing snapshots or recordings. Includes optional stage control functionality for precision microscopy setups.
+A PyQt5 + OpenCV application for streaming webcam feeds and capturing
+snapshots/recordings, with optional stage control for precision microscopy
+setups (Sangaboard or Arduino-based stages).
 
-## Features
+## Project structure
 
-- **Live Webcam Streaming**: Real-time video feed from USB cameras
-- **Snapshot Capture**: Save individual frames as PNG images
-- **Video Recording**: Record video clips as MP4 files
-- **Stage Control**: Integrated control for Sangaboard precision stages
-- **Simulation Mode**: Mock stage controller for testing without hardware
-- **Backlash Compensation**: Optional backlash compensation for precise positioning
-- **Camera Detection**: Automatic camera name detection (Windows, optional)
-- **Multiple Backends**: Support for Media Foundation, DirectShow, and V4L2
-- **Configurable Resolution**: Multiple resolution presets
-- **Timestamp Overlay**: Optional timestamp burning into frames
-- **Extensible Hardware Layer**: Abstract base classes for adding new hardware controllers
+```
+ofm_webcam_gui/
+├── app.py                     # Entry point (python -m ofm_webcam_gui.app)
+├── core/                      # Framework-agnostic types & config (no Qt, no cv2 I/O)
+│   ├── types.py               #   Axis, Direction, Position, Resolution, ...
+│   ├── config.py               #   resolutions, backends, default ports
+│   └── stage_motion.py         #   pure jog-planning math (unit-testable)
+├── hardware/                  # Hardware abstraction layer (no PyQt imports)
+│   ├── abstract.py             #   StageController / CameraController / SensorController ABCs
+│   └── stage/
+│       ├── arduino.py          #   ArduinoStageController
+│       ├── sangaboard.py       #   SangaboardStageController
+│       ├── mock.py             #   MockStageController (simulation)
+│       └── __init__.py         #   create_stage_controller() factory (handles fallback)
+└── ui/                        # PyQt5 presentation layer
+    ├── main_window.py          #   QMainWindow: composes panels + threads
+    ├── panels/                 #   CameraPanel, CapturePanel, StagePanel (QGroupBox widgets)
+    └── threads/                #   CameraThread, StageMovementThread (QThread)
+```
+
+**Dependency direction is one-way:** `ui` → `hardware`/`core`, `hardware` → `core`.
+`core` and `hardware` have zero PyQt imports, so the hardware layer (and the
+jog-planning math in particular) can be unit tested or reused headlessly.
+
+### What changed vs. the original single-file version
+
+- Decluter `webcam_viewer.py` into UI panels (`ui/panels/`),
+  background threads (`ui/threads/`), and a thin `MainWindow` that just wires
+  them together.
+- Stage backends live one-per-file under `hardware/stage/`, sharing position
+  tracking via a small mixin (`_position_tracking.py`) instead of duplicating
+  the same `set_position`/step-delta logic three times.
+- `Direction` is now a proper `Enum` (was raw `'L'/'R'/'U'/'D'/'W'/'S'` strings
+  threaded through the codebase) and carries its own `axis`/`sign`.
+- The "connect to real hardware, fall back to simulation" logic that used to
+  live inline in `MainWindow.__init__` is now `hardware.stage.create_stage_controller()`,
+  independently testable and reusable.
+- Restored `move_steps()` as a concrete method on the `StageController` base
+  class — it was called throughout the original code but only the private
+  `_move_steps_raw` primitive was ever defined.
+- Speed→step-delay math was duplicated UI logic; it's now `core.stage_motion.plan_jog()`,
+  a pure function with no Qt or hardware dependency.
+- Added type hints throughout (`Position`, `AxisCalibration`, `Resolution`,
+  `CameraBackend`, etc. as dataclasses/NamedTuples instead of bare tuples/strings).
 
 ## Installation
 
-### Prerequisites
-
-- Python 3.7 or higher
-- Virtual environment (recommended)
-
-### Setup
-
 ```bash
-# Clone or navigate to the project directory
-cd ofm-webcam-gui
-
-# Create a virtual environment
 python -m venv venv
-
-# Activate the virtual environment
-# Windows:
-venv\Scripts\activate
-# Linux/Mac:
-source venv/bin/activate
-
-# Install dependencies
+source venv/bin/activate   # Windows: venv\Scripts\activate
 pip install -r requirements.txt
 ```
 
 ## Usage
 
-### Basic Webcam Usage
-
 ```bash
-python webcam_viewer.py
+python -m app.py
+python -m app.py --simulate        # no stage hardware required
+python -m app.py --log-level DEBUG
 ```
 
-### Simulation Mode (No Hardware Required)
-
-Test the GUI and stage control features without physical hardware:
-
-```bash
-python webcam_viewer.py --simulate
-```
-
-**Automatic Fallback**: If the app doesn't detect a connected stage controller, it will automatically fall back to simulation mode and display a message in the status bar.
-
-In simulation mode:
-- Stage control buttons work with a mock controller
-- Movements are simulated with accelerated timing (10x faster)
-- Position tracking and backlash compensation work as expected
-- Window title shows "[SIMULATION]" to indicate mode
-- Status bar shows "SIMULATION MODE: Stage controller not detected, using mock controller"
-- Useful for UI testing, demonstrations, and development
+Simulation mode is used automatically if no Sangaboard is detected on the
+configured port, and can also be forced with `--simulate`.
 
 ### Controls
 
-1. **Camera Setup**
-   - Select device index (0, 1, 2...) in the spinbox
-   - Choose backend (Media Foundation recommended for Windows)
-   - Select resolution from dropdown
-   - Click "Start Stream"
-
-2. **Capture**
-   - Click "Save Snapshot (PNG)" to capture current frame
-   - Click "Start Recording (.mp4)" to begin video recording
-   - Files are saved to `gallery/` folder in the project directory by default
-
-3. **Stage Control** (if connected)
-   - Use U/D/L/R buttons for XY movement
-   - Use W/S buttons for Z movement (focus)
-   - Adjust step sizes and speed using spinboxes
-   - View live X, Y, Z position coordinates (updated in real-time)
-   - Enable "Auto-Level Z" for backlash compensation
-
-## Hardware Requirements
-
-### Optional: Stage Control
-
-For stage control functionality, you need:
-- **Sangaboard** controller connected via USB (default)
-- Default port: `COM5` (Windows) or `/dev/ttyACM0` (Linux)
-- Install `sangaboard` Python package
-
-**Note**: The codebase also includes an `ArduinoStageController` implementation for Arduino-based stages (default port: `COM12`). To use it instead of Sangaboard, modify the initialization code in `webcam_viewer.py`.
-
-### Optional: Camera Name Detection (Windows)
-
-For automatic camera name detection:
-- Install `pygrabber` package (included in requirements.txt)
-- Click "Detect Camera Names" button in the app
+1. **Camera** — pick device index, backend, resolution, then Start Stream.
+2. **Snapshots & Recording** — PNG snapshots or MP4 recording, saved to
+   `gallery/` by default (configurable via Browse).
+3. **Stage Control** — U/D/L/R for XY, W/S for Z (focus); step sizes, speed,
+   live position readout, and optional Auto-Level Z.
 
 ## Configuration
 
-### Stage Port
+Default stage port: edit `DEFAULT_STAGE_PORT_WINDOWS` /
+`DEFAULT_STAGE_PORT_LINUX` in `core/config.py`, or pass `port=` to
+`create_stage_controller()` / `SangaboardStageController()` directly. To use
+the Arduino-based stage instead of Sangaboard, construct an
+`ArduinoStageController` in place of the call in `hardware/stage/__init__.py`.
 
-Edit `webcam_viewer.py` line 233 to change the default port:
+## Hardware requirements
 
-```python
-self.stage = SangaboardStageController(port='COM5', timeout=2)
-```
-
-### Output Directory
-
-Default output directory is `gallery/` in the project directory. Change via the "Browse" button in the app.
+- **Sangaboard** controller via USB (default `COM5` on Windows, `/dev/ttyACM0`
+  on Linux). Requires the `sangaboard` package.
+- **Arduino stage** (alternative): default port `COM12`. Requires `pyserial`.
+- **Camera name detection** (Windows only, optional): `pip install pygrabber`,
+  then use the "Detect Camera Names" button.
 
 ## Troubleshooting
 
-### Camera won't start
+**Camera won't start** — try a different device index; switch backend from
+Media Foundation to DirectShow (Windows); check no other app is using the
+camera; confirm drivers are installed.
 
-- Try different device indices (0, 1, 2...)
-- Switch backend from "Media Foundation" to "DirectShow" (Windows)
-- Check if another application is using the camera
-- Ensure camera drivers are installed
+**Stage not connecting** — verify the Sangaboard is on the configured port;
+check Device Manager (Windows) / `/dev/tty*` (Linux); confirm `sangaboard` is
+installed; increase the connect timeout.
 
-### Stage not connecting
-
-- Verify Sangaboard is connected to the correct port
-- Check device manager (Windows) or `/dev/tty*` (Linux)
-- Ensure `sangaboard` package is installed
-- Try increasing timeout value in the code
-
-### Import errors
-
-- Ensure virtual environment is activated
-- Reinstall dependencies: `pip install -r requirements.txt`
-- Check Python version compatibility (3.7+)
-
-## Project Structure
-
-```
-ofm-webcam-gui/
-├── webcam_viewer.py          # Main application
-├── requirements.txt          # Python dependencies
-├── hardware/
-│   ├── __init__.py
-│   ├── abstract.py          # Base controller classes
-│   └── stage.py             # Stage controller implementations (Sangaboard, Arduino, Mock)
-├── core/                     # Future shared utilities
-├── helpers/                  # Future helper functions
-├── logic/                    # Future algorithms/analysis
-└── ui/                       # Future UI components
-```
-
-## Dependencies
-
-- **PyQt5** - GUI framework
-- **opencv-python** - Camera capture and image processing
-- **numpy** - Array operations
-- **sangaboard** - Sangaboard stage controller (optional)
-- **pyserial** - Serial communication for Arduino stage controller (optional)
-- **pygrabber** - Camera name detection (Windows, optional)
+**Import errors** — activate the virtualenv; `pip install -r requirements.txt`;
+confirm Python 3.7+.
 
 ## License
 
-This project is provided as-is for laboratory and educational use.
+See `LICENSE`. Provided as-is for laboratory and educational use.
 
 ## Contributors
 
-Pierre Padilla-Huamantinco, Caracara Tech
-
-## Support
-
-For issues related to:
-- **Sangaboard hardware**: Refer to Sangaboard documentation
-- **Camera compatibility**: Check OpenCV backend compatibility
-- **Python dependencies**: Ensure correct Python version and virtual environment
+Pierre Padilla-Huamantinco, Joaquín Acosta - Caracara Tech

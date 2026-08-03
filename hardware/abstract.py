@@ -1,191 +1,156 @@
 """
 Abstract base classes for hardware controllers.
+
+`StageController` defines the full public contract used by the UI layer.
+Concrete subclasses only need to implement the small "raw" primitives
+(`connect`, `_move_steps_raw`, `get_position`, ...); the higher-level
+convenience methods (`move_steps`, unit conversions, position-in-nm/um)
+are implemented once, here, so behaviour can't drift between backends.
 """
 
+from __future__ import annotations
+
 import abc
-from typing import Tuple
+from typing import Callable, Optional
+
+from core.types import Axis, AxisCalibration, Direction, Position
 
 
 class StageController(abc.ABC):
-    """
-    Abstract base class for stage controllers.
-    Defines the interface for connecting, disconnecting, and moving the stage.
-    """
+    """Abstract base class for stage controllers."""
 
-    def __init__(self):
-        # Calibration factors (nm per step)
-        self.scale_nm_per_step_x = 100.0
-        self.scale_nm_per_step_y = 100.0
-        self.scale_nm_per_step_z = 100.0
-
-        # Minimum delay between steps in microseconds
-        self.min_step_delay_us = 0
-
-        # Stop flag for aborting movements
+    def __init__(self, calibration: AxisCalibration, min_step_delay_us: int = 0) -> None:
+        self.calibration = calibration
+        self.min_step_delay_us = min_step_delay_us
         self._stop_requested = False
 
-    def get_position_nm(self) -> Tuple[float, float, float]:
-        """Returns the current position in nanometers (x, y, z)."""
-        x_step, y_step, z_step = self.get_position()
-        return (x_step * self.scale_nm_per_step_x,
-                y_step * self.scale_nm_per_step_y,
-                z_step * self.scale_nm_per_step_z)
+    # -- Unit conversion -------------------------------------------------
+    def get_position_nm(self) -> Position:
+        steps = self.get_position()
+        return Position(
+            steps.x * self.calibration.nm_per_step(Axis.X),
+            steps.y * self.calibration.nm_per_step(Axis.Y),
+            steps.z * self.calibration.nm_per_step(Axis.Z),
+        )
 
-    def get_position_um(self) -> Tuple[float, float, float]:
-        """Returns the current position in micrometers (x, y, z)."""
-        x_nm, y_nm, z_nm = self.get_position_nm()
-        return (x_nm / 1000.0, y_nm / 1000.0, z_nm / 1000.0)
+    def get_position_um(self) -> Position:
+        nm = self.get_position_nm()
+        return Position(nm.x / 1000.0, nm.y / 1000.0, nm.z / 1000.0)
 
-    def steps_to_nm(self, steps: int, axis: str) -> float:
-        """Convert steps to nanometers for given axis."""
-        if axis.lower() == 'x': return steps * self.scale_nm_per_step_x
-        if axis.lower() == 'y': return steps * self.scale_nm_per_step_y
-        if axis.lower() == 'z': return steps * self.scale_nm_per_step_z
-        return 0
+    def steps_to_nm(self, steps: float, axis: Axis) -> float:
+        return steps * self.calibration.nm_per_step(axis)
 
-    def nm_to_steps(self, nm: float, axis: str) -> int:
-        """Convert nanometers to steps for given axis."""
-        scale = 1.0
-        if axis.lower() == 'x': scale = self.scale_nm_per_step_x
-        if axis.lower() == 'y': scale = self.scale_nm_per_step_y
-        if axis.lower() == 'z': scale = self.scale_nm_per_step_z
-        # Round to nearest integer step
-        return int(round(nm / scale)) if scale != 0 else 0
+    def nm_to_steps(self, nm: float, axis: Axis) -> int:
+        scale = self.calibration.nm_per_step(axis)
+        return int(round(nm / scale)) if scale else 0
 
-    def um_to_steps(self, um: float, axis: str) -> int:
-        """Convert micrometers to steps for given axis."""
+    def um_to_steps(self, um: float, axis: Axis) -> int:
         return self.nm_to_steps(um * 1000.0, axis)
 
+    # -- High-level motion -------------------------------------------------
+    def move_steps(
+        self,
+        direction: Direction,
+        steps: int,
+        delay_per_step_s: float,
+        callback: Optional[Callable[[], None]] = None,
+    ) -> None:
+        """Move `steps` steps in `direction`, honouring the controller's
+        minimum step delay. This is the method UI/thread code should call;
+        subclasses implement the hardware-specific `_move_steps_raw`."""
+        min_delay_s = self.min_step_delay_us / 1_000_000.0
+        delay_per_step_s = max(delay_per_step_s, min_delay_s)
+        self._move_steps_raw(direction, max(0, int(steps)), delay_per_step_s, callback)
+
+    # -- Abstract primitives, implemented per backend ----------------------
     @abc.abstractmethod
-    def connect(self):
-        """Connect to the stage controller."""
-        pass
+    def connect(self) -> None: ...
 
     @abc.abstractmethod
-    def disconnect(self):
-        """Disconnect from the stage controller."""
-        pass
+    def disconnect(self) -> None: ...
 
     @abc.abstractmethod
-    def is_connected(self) -> bool:
-        """Check if the controller is connected."""
-        pass
+    def is_connected(self) -> bool: ...
 
     @abc.abstractmethod
-    def send_command(self, cmd: str):
-        """Send a raw command to the controller."""
-        pass
+    def send_command(self, cmd: str) -> None: ...
 
     @abc.abstractmethod
-    def _move_steps_raw(self, command_char: str, steps: int, delay_per_step: float, callback=None):
-        """
-        Actual hardware implementation of moving steps.
-        """
-        pass
+    def _move_steps_raw(
+        self,
+        direction: Direction,
+        steps: int,
+        delay_per_step_s: float,
+        callback: Optional[Callable[[], None]],
+    ) -> None: ...
 
     @abc.abstractmethod
-    def stop(self):
-        """Stops any current movement immediately."""
-        pass
+    def stop(self) -> bool: ...
 
     @abc.abstractmethod
-    def set_step_delay(self, delay_us: int) -> bool:
-        """
-        Set the minimum time between steps in microseconds.
-        Returns True if successful/supported, False otherwise.
-        """
-        pass
+    def set_step_delay(self, delay_us: int) -> bool: ...
 
     @abc.abstractmethod
-    def get_position(self) -> tuple:
-        """Returns current (x, y, z) in steps."""
-        pass
+    def get_position(self) -> Position:
+        """Current (x, y, z) in steps."""
 
     @abc.abstractmethod
-    def set_position(self, x=0, y=0, z=0, relative_move_to_target=False):
-        """
-        Sets the current logical position.
-        If relative_move_to_target is True, it moves the stage solely by the difference
-        between the current position and the target (x, y, z).
-        If False (default), it just overwrites the internal position register (if supported).
-        """
-        pass
+    def set_position(self, x: float = 0, y: float = 0, z: float = 0, relative_move_to_target: bool = False) -> None:
+        """Set the logical position. If `relative_move_to_target`, physically
+        move the stage by the delta between current and target; otherwise
+        just overwrite the internal position register (if supported)."""
 
 
 class SensorController(abc.ABC):
-    """
-    Abstract base class for sensor controllers (camera, power meter, etc.).
-    Provides a common interface for measurement devices.
-    """
-    @abc.abstractmethod
-    def connect(self):
-        pass
+    """Abstract base class for sensor controllers (camera, power meter, etc.)."""
 
     @abc.abstractmethod
-    def disconnect(self):
-        pass
+    def connect(self) -> None: ...
 
     @abc.abstractmethod
-    def get_measurement(self):
-        """Returns a measurement from the sensor. Type depends on sensor."""
-        pass
+    def disconnect(self) -> None: ...
 
     @abc.abstractmethod
-    def get_averaged_measurement(self, n_avg=1, timeout_scale=1.0):
-        """Returns an averaged measurement from multiple captures."""
-        pass
+    def get_measurement(self): ...
 
     @abc.abstractmethod
-    def get_device_info(self):
-        """Returns device information (name, serial number, etc.)."""
-        pass
+    def get_averaged_measurement(self, n_avg: int = 1, timeout_scale: float = 1.0): ...
+
+    @abc.abstractmethod
+    def get_device_info(self): ...
 
 
 class CameraController(SensorController):
-    """
-    Abstract base class for camera controllers.
-    """
-    @abc.abstractmethod
-    def arm(self, buffer_count=2):
-        pass
+    """Abstract base class for camera controllers (SDK-driven, e.g. scientific cameras;
+    distinct from the OpenCV `cv2.VideoCapture`-based webcam path used elsewhere)."""
 
     @abc.abstractmethod
-    def set_exposure(self, exposure_ms: float):
-        pass
+    def arm(self, buffer_count: int = 2): ...
 
     @abc.abstractmethod
-    def set_gain(self, gain_db: float):
-        pass
+    def set_exposure(self, exposure_ms: float): ...
 
     @abc.abstractmethod
-    def start_acquisition(self):
-        pass
+    def set_gain(self, gain_db: float): ...
 
     @abc.abstractmethod
-    def stop_acquisition(self):
-        pass
+    def start_acquisition(self): ...
+
+    @abc.abstractmethod
+    def stop_acquisition(self): ...
 
     @abc.abstractmethod
     def get_frame(self):
         """Returns a processed frame (2D numpy array) or None."""
-        pass
 
     @abc.abstractmethod
-    def get_averaged_frame(self, n_avg=1, timeout_scale=1.0):
-        """Returns an averaged frame from multiple captures."""
-        pass
+    def get_averaged_frame(self, n_avg: int = 1, timeout_scale: float = 1.0): ...
 
     @abc.abstractmethod
-    def set_roi(self, x, y, width, height):
-        """Sets the hardware Region of Interest."""
-        pass
+    def set_roi(self, x: int, y: int, width: int, height: int): ...
 
     @abc.abstractmethod
-    def reset_roi(self):
-        """Resets ROI to full sensor."""
-        pass
+    def reset_roi(self): ...
 
     @abc.abstractmethod
-    def get_roi(self):
-        """Returns (x, y, width, height)."""
-        pass
+    def get_roi(self): ...
