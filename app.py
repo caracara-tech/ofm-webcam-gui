@@ -1,9 +1,9 @@
 """
 OFM Webcam Viewer — entry point.
 
-Run with:
-    python -m ofm_webcam_gui.app
-    python -m ofm_webcam_gui.app --simulate
+Run from the repository root (the directory containing this file):
+    python app.py
+    python app.py --simulate
 """
 
 from __future__ import annotations

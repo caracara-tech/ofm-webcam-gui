@@ -1,0 +1,9 @@
+# Cross-platform dependencies (Windows + Linux)
+PyQt5>=5.15.0
+# Use the headless build: opencv-python bundles its own Qt "xcb" plugin
+# which conflicts with PyQt5's on Linux (and can cause similar grief on
+# Windows). We don't use any of OpenCV's own GUI/HighGUI windows since
+# PyQt5 is the GUI layer, so headless is a safe, drop-in swap.
+opencv-python-headless>=4.5.0
+numpy>=1.19.0
+pyserial>=3.5

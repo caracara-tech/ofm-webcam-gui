@@ -9,7 +9,7 @@ from typing import Callable, Optional
 from core.config import SANGABOARD_MAX_STEPS_PER_SEC, default_stage_port
 from core.types import AxisCalibration, Direction
 from hardware.abstract import StageController
-from _position_tracking import PositionTrackingMixin
+from ._position_tracking import PositionTrackingMixin
 
 logger = logging.getLogger(__name__)
 

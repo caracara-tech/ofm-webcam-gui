@@ -8,10 +8,10 @@ from typing import Callable, Optional
 
 import serial
 
-from core.config import DEFAULT_ARDUINO_PORT_WINDOWS
+from core.config import default_arduino_port
 from core.types import AxisCalibration, Direction
 from hardware.abstract import StageController
-from _position_tracking import PositionTrackingMixin
+from ._position_tracking import PositionTrackingMixin
 
 logger = logging.getLogger(__name__)
 
@@ -23,9 +23,9 @@ class ArduinoStageController(PositionTrackingMixin, StageController):
     """Stage controller for the Arduino-based setup, talking raw single-char
     move commands ('L','R','U','D','W','S') over a serial connection."""
 
-    def __init__(self, port: str = DEFAULT_ARDUINO_PORT_WINDOWS, baudrate: int = 9600, timeout: float = 1):
+    def __init__(self, port: Optional[str] = None, baudrate: int = 9600, timeout: float = 1):
         super().__init__(calibration=ARDUINO_CALIBRATION)
-        self.port = port
+        self.port = port or default_arduino_port()
         self.baudrate = baudrate
         self.timeout = timeout
         self.connection: Optional[serial.Serial] = None

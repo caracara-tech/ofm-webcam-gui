@@ -8,7 +8,6 @@ is UI composition and event routing only.
 from __future__ import annotations
 
 import logging
-import platform
 from datetime import datetime
 from pathlib import Path
 from typing import Optional
@@ -24,12 +23,13 @@ from PyQt5.QtWidgets import (
 from core.config import DEFAULT_OUTPUT_DIR, SANGABOARD_MAX_STEPS_PER_SEC
 from core.stage_motion import plan_jog
 from core.types import Direction, StageMotionSettings
+from hardware.camera_names import detect_camera_names
 from hardware.stage import SangaboardStageController, StageInitResult, create_stage_controller
-from panels.camera_panel import CameraPanel
-from panels.capture_panel import CapturePanel
-from panels.stage_panel import StagePanel
-from threads.camera_thread import CameraThread
-from threads.stage_thread import StageMovementThread
+from .panels.camera_panel import CameraPanel
+from .panels.capture_panel import CapturePanel
+from .panels.stage_panel import StagePanel
+from .threads.camera_thread import CameraThread
+from .threads.stage_thread import StageMovementThread
 
 logger = logging.getLogger(__name__)
 
@@ -121,7 +121,8 @@ class MainWindow(QMainWindow):
 
     # ----------------------------------------------------- Camera handling --
     def _detect_camera_names(self) -> None:
-        if platform.system() != "Windows":
+        result = detect_camera_names()
+        if not result.supported:
             QMessageBox.information(
                 self, "Windows only",
                 "Name detection uses DirectShow and only works on Windows.\n\n"
@@ -129,27 +130,13 @@ class MainWindow(QMainWindow):
                 "Start Stream to find the right one.",
             )
             return
-        try:
-            from pygrabber.dshow_graph import FilterGraph
-        except ImportError:
-            QMessageBox.information(
-                self, "Optional package needed",
-                "Install pygrabber to auto-detect camera names:\n\n"
-                "    pip install pygrabber\n\n"
-                "Then click this button again. In the meantime, just try "
-                "device index 0, 1, 2... in the spinbox and click Start "
-                "Stream to find your webcam.",
-            )
+        if result.error:
+            QMessageBox.information(self, "Camera name detection", result.error)
             return
-        try:
-            names = FilterGraph().get_input_devices()
-        except Exception as exc:
-            QMessageBox.warning(self, "Detection failed", f"Could not list camera devices: {exc}")
-            return
-        if not names:
+        if not result.names:
             QMessageBox.information(self, "No cameras found", "No DirectShow camera devices were detected.")
             return
-        lines = "\n".join(f"  {i}: {name}" for i, name in enumerate(names))
+        lines = "\n".join(f"  {i}: {name}" for i, name in enumerate(result.names))
         QMessageBox.information(
             self, "Detected cameras",
             f"Device order seen by Windows (usually matches the index used "

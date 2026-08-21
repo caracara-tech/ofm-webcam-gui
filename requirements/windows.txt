@@ -1,0 +1,7 @@
+-r base.txt
+
+# Sangaboard stage controller
+sangaboard>=0.1.0
+
+# Camera name detection (Windows-only feature, see hardware/camera_names.py)
+pygrabber>=0.1.0

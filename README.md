@@ -32,7 +32,7 @@ jog-planning math in particular) can be unit tested or reused headlessly.
 
 ### What changed vs. the original single-file version
 
-- Decluter `webcam_viewer.py` into UI panels (`ui/panels/`),
+- Split the ~680-line `webcam_viewer.py` into UI panels (`ui/panels/`),
   background threads (`ui/threads/`), and a thin `MainWindow` that just wires
   them together.
 - Stage backends live one-per-file under `hardware/stage/`, sharing position
@@ -51,12 +51,34 @@ jog-planning math in particular) can be unit tested or reused headlessly.
 - Added type hints throughout (`Position`, `AxisCalibration`, `Resolution`,
   `CameraBackend`, etc. as dataclasses/NamedTuples instead of bare tuples/strings).
 
-## Installation
+## Cross-platform support (Windows + Debian-based Linux)
+
+All platform-specific decisions — default backend, default serial port,
+whether camera-name detection is available — are resolved by
+`core/platform_info.py` at **runtime**, not by maintaining separate code
+branches. Nothing else in the codebase calls `platform.system()` directly:
+
+- `core/platform_info.py` — detects `Platform.WINDOWS` / `.LINUX` / `.MACOS`
+  and exposes a `PlatformProfile` (default backend index, default stage
+  port, `supports_camera_name_detection`).
+- `hardware/camera_names.py` — the Windows-only (`pygrabber`/DirectShow)
+  camera-name feature. On Linux it returns `supported=False` without ever
+  importing `pygrabber`, so that dependency doesn't need to exist there.
+- `requirements/` — split into `base.txt` (shared), `windows.txt` (adds
+  `pygrabber`), and `linux.txt` (omits it — it can't be installed on Linux).
+- `hardware/stage/arduino.py` / `sangaboard.py` default to `COM*` ports on
+  Windows and `/dev/tty*` on Linux via the same profile.
+
+## Installation (running from source)
 
 ```bash
 python -m venv venv
 source venv/bin/activate   # Windows: venv\Scripts\activate
-pip install -r requirements.txt
+
+# Windows:
+pip install -r ofm_webcam_gui/requirements/windows.txt
+# Linux:
+pip install -r ofm_webcam_gui/requirements/linux.txt
 ```
 
 ## Usage
@@ -113,4 +135,4 @@ See `LICENSE`. Provided as-is for laboratory and educational use.
 
 ## Contributors
 
-Pierre Padilla-Huamantinco, Joaquín Acosta - Caracara Tech
+Pierre Padilla-Huamantinco, Caracara Tech

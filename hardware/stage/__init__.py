@@ -12,9 +12,9 @@ from typing import Optional
 
 from hardware.abstract import StageController
 
-from stage.arduino import ArduinoStageController
-from stage.mock import MockStageController
-from stage.sangaboard import SangaboardStageController
+from .arduino import ArduinoStageController
+from .mock import MockStageController
+from .sangaboard import SangaboardStageController
 
 logger = logging.getLogger(__name__)
 

@@ -3,16 +3,22 @@ Static application configuration.
 
 Nothing in this module has side effects on import (no cv2 backend probing,
 no filesystem writes) so it's safe to import from anywhere, including tests.
+
+Platform-specific defaults (ports, preferred backend) are NOT decided here —
+they come from `core.platform_info.current_profile()`, which is the single
+place that inspects the OS. This file just exposes the platform-independent
+menus (all resolutions/backends are offered on every OS; the profile only
+picks a *default* index).
 """
 
 from __future__ import annotations
 
-import platform
 from pathlib import Path
 
 import cv2
 
-from core.types import CameraBackend, Resolution
+from .platform_info import current_profile
+from .types import CameraBackend, Resolution
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 DEFAULT_OUTPUT_DIR = PROJECT_ROOT / "gallery"
@@ -32,22 +38,17 @@ BACKENDS: list[CameraBackend] = [
     CameraBackend("V4L2 (Linux)", cv2.CAP_V4L2),
 ]
 
-DEFAULT_STAGE_PORT_WINDOWS = "COM5"
-DEFAULT_STAGE_PORT_LINUX = "/dev/ttyACM0"
-DEFAULT_ARDUINO_PORT_WINDOWS = "COM12"
-
 SIMULATION_SPEED_MULTIPLIER = 10.0
 SANGABOARD_MAX_STEPS_PER_SEC = 1000
 
 
 def default_backend_index() -> int:
-    system = platform.system()
-    if system == "Windows":
-        return 1  # Media Foundation
-    if system == "Linux":
-        return 3  # V4L2
-    return 0  # Auto (macOS / unknown)
+    return current_profile().default_backend_index
 
 
 def default_stage_port() -> str:
-    return DEFAULT_STAGE_PORT_WINDOWS if platform.system() == "Windows" else DEFAULT_STAGE_PORT_LINUX
+    return current_profile().default_stage_port
+
+
+def default_arduino_port() -> str:
+    return current_profile().default_arduino_port

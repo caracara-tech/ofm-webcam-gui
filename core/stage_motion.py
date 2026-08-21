@@ -10,7 +10,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from core.types import AxisCalibration, Direction, StageMotionSettings
+from .types import AxisCalibration, Direction, StageMotionSettings
 
 MIN_SPEED_UM_S = 0.1
 
