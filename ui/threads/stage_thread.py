@@ -23,7 +23,7 @@ class _QueuedMovement:
 class StageMovementThread(QThread):
     """Handles stage movements in a background thread to avoid blocking the UI."""
 
-    movement_complete = pyqtSignal(str)
+    movement_complete = pyqtSignal(str, object)  # (status_message, Direction)
 
     def __init__(self) -> None:
         super().__init__()
@@ -51,9 +51,9 @@ class StageMovementThread(QThread):
 
             try:
                 item.stage.move_steps(item.direction, item.steps, item.delay_per_step_s)
-                self.movement_complete.emit(item.status_message)
+                self.movement_complete.emit(item.status_message, item.direction)
             except Exception as e:
-                self.movement_complete.emit(f"Error: {e}")
+                self.movement_complete.emit(f"Error: {e}", item.direction)
 
     def stop(self) -> None:
         self._running = False

@@ -20,14 +20,16 @@ from PyQt5.QtWidgets import (
     QFileDialog, QHBoxLayout, QLabel, QMainWindow, QMessageBox, QStatusBar, QVBoxLayout, QWidget,
 )
 
+from core.autofocus import AutoFocusSettings
 from core.config import DEFAULT_OUTPUT_DIR, SANGABOARD_MAX_STEPS_PER_SEC
 from core.stage_motion import plan_jog
-from core.types import Direction, StageMotionSettings
+from core.types import Axis, Direction, StageMotionSettings
 from hardware.camera_names import detect_camera_names
 from hardware.stage import SangaboardStageController, StageInitResult, create_stage_controller
 from .panels.camera_panel import CameraPanel
 from .panels.capture_panel import CapturePanel
 from .panels.stage_panel import StagePanel
+from .threads.autofocus_thread import AutoFocusThread
 from .threads.camera_thread import CameraThread
 from .threads.stage_thread import StageMovementThread
 
@@ -35,6 +37,8 @@ logger = logging.getLogger(__name__)
 
 POSITION_POLL_INTERVAL_MS = 100
 APP_TITLE = "OFM Webcam Viewer v0.1"
+SNAPSHOT_FLASH_MS = 120
+RECORDING_BLINK_INTERVAL_MS = 500
 
 
 class MainWindow(QMainWindow):
@@ -49,6 +53,11 @@ class MainWindow(QMainWindow):
         self.last_frame: Optional[np.ndarray] = None
         self.frame_count = 0
         self.snapshot_count = 0
+        self._recording_blink_on = False
+
+        self.autofocus_thread: Optional[AutoFocusThread] = None
+        self._movement_busy = False  # true while a jog or an autofocus sweep is running
+        self._last_jog_axis: Optional[Axis] = None
 
         stage_init: StageInitResult = create_stage_controller(simulate=simulation_mode)
         self.stage = stage_init.controller
@@ -71,6 +80,9 @@ class MainWindow(QMainWindow):
         self.position_timer.start(POSITION_POLL_INTERVAL_MS)
         self._update_position_display()
 
+        self.recording_blink_timer = QTimer(self)
+        self.recording_blink_timer.timeout.connect(self._toggle_recording_blink)
+
     # ---------------------------------------------------------------- UI ---
     def _build_ui(self) -> None:
         central = QWidget()
@@ -83,6 +95,13 @@ class MainWindow(QMainWindow):
         self.video_label.setText("Camera stopped")
         self.video_label.setMinimumSize(640, 480)
         main_layout.addWidget(self.video_label, stretch=3)
+
+        # Plain white overlay used for the snapshot "flash". Kept as a child
+        # of video_label so it always sits exactly on top of the picture;
+        # geometry is resynced whenever video_label's size changes.
+        self.flash_overlay = QLabel(self.video_label)
+        self.flash_overlay.setStyleSheet("background-color: white;")
+        self.flash_overlay.hide()
 
         controls = QWidget()
         controls.setFixedWidth(280)
@@ -104,6 +123,7 @@ class MainWindow(QMainWindow):
         self.stage_panel = StagePanel(self.stage_settings)
         self.stage_panel.jog_requested.connect(self._on_jog_requested)
         self.stage_panel.settings_changed.connect(self._on_stage_settings_changed)
+        self.stage_panel.autofocus_requested.connect(self._run_autofocus)
         if self.stage is None:
             self.stage_panel.set_enabled_all(False)
         controls_layout.addWidget(self.stage_panel)
@@ -151,6 +171,7 @@ class MainWindow(QMainWindow):
         backend = self.camera_panel.backend
 
         self.video_label.setFixedSize(resolution.width, resolution.height)
+        self.flash_overlay.setGeometry(self.video_label.rect())
         self.camera_thread = CameraThread(device_index, resolution.width, resolution.height, backend.cv2_flag)
         self.camera_thread.frame_ready.connect(self._on_frame)
         self.camera_thread.error_occurred.connect(self._on_error)
@@ -179,15 +200,25 @@ class MainWindow(QMainWindow):
         self.frame_count += 1
         self.last_frame = frame  # raw frame, used as the basis for exports
 
-        display_frame = self._draw_overlays(frame.copy())
+        recorded_frame = self._draw_overlays(frame.copy())
+        if self.video_writer is not None:
+            self.video_writer.write(recorded_frame)
+
+        # The blinking "REC" dot is a live-preview cue only - it's overlaid
+        # after writing so it never ends up baked into the saved video.
+        display_frame = recorded_frame
+        if self.video_writer is not None and self._recording_blink_on:
+            display_frame = recorded_frame.copy()
+            cv2.circle(display_frame, (24, 24), 9, (0, 0, 255), -1, cv2.LINE_AA)
+            cv2.putText(
+                display_frame, "REC", (40, 32),
+                cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 0, 255), 2, cv2.LINE_AA,
+            )
 
         rgb = cv2.cvtColor(display_frame, cv2.COLOR_BGR2RGB)
         h, w, ch = rgb.shape
         qimg = QImage(rgb.data, w, h, ch * w, QImage.Format_RGB888)
         self.video_label.setPixmap(QPixmap.fromImage(qimg))
-
-        if self.video_writer is not None:
-            self.video_writer.write(display_frame)
 
         self.status.showMessage(f"Frame {self.frame_count} | {fps:.1f} fps")
 
@@ -199,6 +230,9 @@ class MainWindow(QMainWindow):
                 cv2.FONT_HERSHEY_SIMPLEX, 0.55, (0, 220, 90), 1, cv2.LINE_AA,
             )
         return frame
+
+    def _toggle_recording_blink(self) -> None:
+        self._recording_blink_on = not self._recording_blink_on
 
     # -------------------------------------------------------------- Export --
     def _choose_output_dir(self) -> None:
@@ -217,6 +251,13 @@ class MainWindow(QMainWindow):
         filename = self._output_dir / f"frame_{ts}.png"
         cv2.imwrite(str(filename), frame)
         self.status.showMessage(f"Saved {filename}  ({self.snapshot_count} total)")
+        self._flash_snapshot()
+
+    def _flash_snapshot(self) -> None:
+        self.flash_overlay.setGeometry(self.video_label.rect())
+        self.flash_overlay.show()
+        self.flash_overlay.raise_()
+        QTimer.singleShot(SNAPSHOT_FLASH_MS, self.flash_overlay.hide)
 
     def _toggle_recording(self) -> None:
         if self.video_writer is None:
@@ -229,10 +270,14 @@ class MainWindow(QMainWindow):
             fourcc = cv2.VideoWriter_fourcc(*"mp4v")
             self.video_writer = cv2.VideoWriter(str(path), fourcc, 20.0, (w, h))
             self.capture_panel.set_recording(True)
+            self._recording_blink_on = True
+            self.recording_blink_timer.start(RECORDING_BLINK_INTERVAL_MS)
             self.status.showMessage(f"Recording to {path}")
         else:
             self.video_writer.release()
             self.video_writer = None
+            self.recording_blink_timer.stop()
+            self._recording_blink_on = False
             self.capture_panel.set_recording(False)
             self.status.showMessage("Recording stopped")
 
@@ -241,8 +286,12 @@ class MainWindow(QMainWindow):
         self._stop_stream()
         if self.stage_thread is not None:
             self.stage_thread.stop()
+        if self.autofocus_thread is not None:
+            self.autofocus_thread.wait(2000)
         if hasattr(self, "position_timer"):
             self.position_timer.stop()
+        if hasattr(self, "recording_blink_timer"):
+            self.recording_blink_timer.stop()
         if self.stage is not None:
             self.stage.disconnect()
         event.accept()
@@ -252,6 +301,8 @@ class MainWindow(QMainWindow):
         self.stage_settings = settings
 
     def _on_jog_requested(self, direction: Direction) -> None:
+        if self._movement_busy:
+            return  # a jog or autofocus sweep is already in flight
         if self.stage is None or not self.stage.is_connected():
             self.status.showMessage("Stage not connected")
             return
@@ -270,6 +321,8 @@ class MainWindow(QMainWindow):
         if hasattr(self.stage, "set_step_delay"):
             self.stage.set_step_delay(int(plan.delay_per_step_s * 1e6))
 
+        self._last_jog_axis = direction.axis
+        self._set_movement_busy(True)
         self.stage_thread.add_movement(
             self.stage, direction, plan.steps, plan.delay_per_step_s,
             f"Moved {direction.value} {plan.distance_um:.1f} \u00b5m",
@@ -279,6 +332,46 @@ class MainWindow(QMainWindow):
         if self.stage is not None and self.stage.is_connected():
             self.stage_panel.update_position_display(self.stage.get_position_um())
 
-    def _on_movement_complete(self, message: str) -> None:
+    def _on_movement_complete(self, message: str, direction: Direction) -> None:
         self.status.showMessage(message)
         self._update_position_display()
+        self._set_movement_busy(False)
+
+        if direction.axis != Axis.Z and self.stage_settings.autofocus_after_xy_jog:
+            self._run_autofocus()
+
+    def _set_movement_busy(self, busy: bool) -> None:
+        """Disables the jog/autofocus buttons for the duration of a move so
+        a second movement can't be queued on top of one that's in flight."""
+        self._movement_busy = busy
+        self.stage_panel.set_jog_enabled(not busy)
+
+    # -------------------------------------------------------------- Focus --
+    def _run_autofocus(self) -> None:
+        if self._movement_busy:
+            return
+        if self.stage is None or not self.stage.is_connected():
+            self.status.showMessage("Stage not connected")
+            return
+        if self.last_frame is None:
+            self.status.showMessage("Start the camera stream before running autofocus.")
+            return
+
+        self._set_movement_busy(True)
+        self.status.showMessage("Running auto-focus...")
+
+        self.autofocus_thread = AutoFocusThread(
+            self.stage, lambda: self.last_frame, AutoFocusSettings(),
+        )
+        self.autofocus_thread.progress.connect(self._on_autofocus_progress)
+        self.autofocus_thread.finished_focus.connect(self._on_autofocus_finished)
+        self.autofocus_thread.start()
+
+    def _on_autofocus_progress(self, step: int, total: int) -> None:
+        self.status.showMessage(f"Auto-focus: sampling position {step}/{total}...")
+
+    def _on_autofocus_finished(self, message: str) -> None:
+        self.status.showMessage(message)
+        self._update_position_display()
+        self._set_movement_busy(False)
+        self.autofocus_thread = None

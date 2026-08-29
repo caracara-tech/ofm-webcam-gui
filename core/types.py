@@ -99,4 +99,4 @@ class StageMotionSettings:
     xy_step_um: float = 10.0
     z_step_um: float = 1.0
     speed_um_per_s: float = 100.0
-    auto_level_z: bool = False
+    autofocus_after_xy_jog: bool = False

@@ -5,7 +5,8 @@ from __future__ import annotations
 from PyQt5.QtCore import pyqtSignal
 from PyQt5.QtWidgets import QComboBox, QGridLayout, QGroupBox, QLabel, QPushButton, QSpinBox
 
-from core.config import BACKENDS, RESOLUTIONS, default_backend_index
+from core.config import RESOLUTIONS, default_backend_position, platform_backends
+from core.platform_info import current_profile
 
 
 class CameraPanel(QGroupBox):
@@ -26,15 +27,19 @@ class CameraPanel(QGroupBox):
         self.device_spin.setValue(0)
         layout.addWidget(self.device_spin, 0, 1)
 
-        self.detect_names_btn = QPushButton("Detect Camera Names (Windows)")
+        # Only offered on platforms where it actually works (Windows/DirectShow).
+        self._show_detect_names = current_profile().supports_camera_name_detection
+        self.detect_names_btn = QPushButton("Detect Camera Names")
         self.detect_names_btn.clicked.connect(self.detect_names_requested.emit)
+        self.detect_names_btn.setVisible(self._show_detect_names)
         layout.addWidget(self.detect_names_btn, 1, 0, 1, 2)
 
         layout.addWidget(QLabel("Backend:"), 2, 0)
         self.backend_combo = QComboBox()
-        for backend in BACKENDS:
+        self._backends = platform_backends()
+        for backend in self._backends:
             self.backend_combo.addItem(backend.label)
-        self.backend_combo.setCurrentIndex(default_backend_index())
+        self.backend_combo.setCurrentIndex(default_backend_position())
         layout.addWidget(self.backend_combo, 2, 1)
 
         layout.addWidget(QLabel("Resolution:"), 3, 0)
@@ -69,4 +74,4 @@ class CameraPanel(QGroupBox):
 
     @property
     def backend(self):
-        return BACKENDS[self.backend_combo.currentIndex()]
+        return self._backends[self.backend_combo.currentIndex()]

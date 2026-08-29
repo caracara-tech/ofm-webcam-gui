@@ -25,17 +25,20 @@ class StagePanel(QGroupBox):
 
     jog_requested = pyqtSignal(object)  # Direction
     settings_changed = pyqtSignal(object)  # StageMotionSettings
+    autofocus_requested = pyqtSignal()
 
     def __init__(self, initial_settings: StageMotionSettings, parent=None):
         super().__init__("Stage Control", parent)
         self.settings = initial_settings
         layout = QGridLayout(self)
 
+        self._direction_buttons: list[QPushButton] = []
         for direction, label, row, col in _DIRECTION_BUTTONS:
             btn = QPushButton(label)
             btn.setMaximumWidth(60)
             btn.clicked.connect(lambda checked=False, d=direction: self.jog_requested.emit(d))
             layout.addWidget(btn, row, col)
+            self._direction_buttons.append(btn)
 
         layout.addWidget(QLabel("XY Step (\u00b5m):"), 2, 0, 1, 2)
         self.xy_step_spin = QSpinBox()
@@ -68,17 +71,24 @@ class StagePanel(QGroupBox):
         pos_layout.addWidget(self.pos_z_label)
         layout.addLayout(pos_layout, 6, 0, 1, 4)
 
-        self.bed_check = QCheckBox("Auto-Level Z")
-        self.bed_check.setChecked(self.settings.auto_level_z)
-        self.bed_check.toggled.connect(self._emit_settings)
-        layout.addWidget(self.bed_check, 7, 0, 1, 4)
+        self.autofocus_btn = QPushButton("Run Auto-Focus (Z sweep)")
+        self.autofocus_btn.clicked.connect(self.autofocus_requested.emit)
+        layout.addWidget(self.autofocus_btn, 7, 0, 1, 4)
+
+        self.autofocus_after_jog_check = QCheckBox("Auto-focus after each XY move")
+        self.autofocus_after_jog_check.setToolTip(
+            "Automatically re-runs the Z-sweep autofocus after every X/Y jog."
+        )
+        self.autofocus_after_jog_check.setChecked(self.settings.autofocus_after_xy_jog)
+        self.autofocus_after_jog_check.toggled.connect(self._emit_settings)
+        layout.addWidget(self.autofocus_after_jog_check, 8, 0, 1, 4)
 
     def _emit_settings(self, *_args) -> None:
         self.settings = StageMotionSettings(
             xy_step_um=float(self.xy_step_spin.value()),
             z_step_um=float(self.z_step_spin.value()),
             speed_um_per_s=float(self.speed_spin.value()),
-            auto_level_z=self.bed_check.isChecked(),
+            autofocus_after_xy_jog=self.autofocus_after_jog_check.isChecked(),
         )
         self.settings_changed.emit(self.settings)
 
@@ -93,3 +103,11 @@ class StagePanel(QGroupBox):
             widget = item.widget() if item else None
             if widget is not None:
                 widget.setEnabled(enabled)
+
+    def set_jog_enabled(self, enabled: bool) -> None:
+        """Enable/disable just the direction and autofocus buttons - used to
+        block new movement requests while one is already in flight, without
+        touching the step/speed spinboxes or position labels."""
+        for btn in self._direction_buttons:
+            btn.setEnabled(enabled)
+        self.autofocus_btn.setEnabled(enabled)
