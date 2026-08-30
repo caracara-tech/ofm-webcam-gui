@@ -362,9 +362,14 @@ class MainWindow(QMainWindow):
 
         self.autofocus_thread = AutoFocusThread(
             self.stage, lambda: self.last_frame, AutoFocusSettings(),
+            frame_id_getter=lambda: self.frame_count,
         )
         self.autofocus_thread.progress.connect(self._on_autofocus_progress)
         self.autofocus_thread.finished_focus.connect(self._on_autofocus_finished)
+        # Let Qt tear the QThread down only once it has actually finished
+        # running (finished() fires after run() has fully returned), rather
+        # than us dropping the last Python reference to it ourselves.
+        self.autofocus_thread.finished.connect(self.autofocus_thread.deleteLater)
         self.autofocus_thread.start()
 
     def _on_autofocus_progress(self, step: int, total: int) -> None:
@@ -374,4 +379,13 @@ class MainWindow(QMainWindow):
         self.status.showMessage(message)
         self._update_position_display()
         self._set_movement_busy(False)
+        # Make sure the OS thread has actually wound down before we let go
+        # of our reference - finished_focus is emitted from inside run(),
+        # so there's a brief window right after where the thread object is
+        # still technically "running" from Qt's point of view. Dropping the
+        # only Python reference during that window causes PyQt to destroy
+        # the QThread while it's still running, which is a fatal error
+        # ("QThread: Destroyed while thread is still running" -> abort).
+        if self.autofocus_thread is not None:
+            self.autofocus_thread.wait()
         self.autofocus_thread = None

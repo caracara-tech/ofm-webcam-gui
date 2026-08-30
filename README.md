@@ -1,73 +1,59 @@
 # OFM Webcam Viewer
 
 A PyQt5 + OpenCV application for streaming webcam feeds and capturing
-snapshots/recordings, with optional stage control for precision microscopy
-setups (Sangaboard or Arduino-based stages).
+snapshots/recordings, with optional precision XYZ stage control and
+coarse-to-fine autofocus for microscopy setups (Sangaboard or Arduino-based
+stages).
+
+> **New to this codebase?** See the [developer wiki](docs/WIKI.md) for an
+> architecture deep-dive, a suggested reading order, and documentation of
+> every key function. This README covers running the app.
+
+---
 
 ## Project structure
 
 ```
-ofm_webcam_gui/
-├── app.py                     # Entry point (python -m ofm_webcam_gui.app)
-├── core/                      # Framework-agnostic types & config (no Qt, no cv2 I/O)
-│   ├── types.py               #   Axis, Direction, Position, Resolution, ...
-│   ├── config.py               #   resolutions, backends, default ports
-│   └── stage_motion.py         #   pure jog-planning math (unit-testable)
-├── hardware/                  # Hardware abstraction layer (no PyQt imports)
+ofm-webcam-gui/
+├── app.py                      # Entry point: python app.py [--simulate] [--log-level DEBUG]
+├── core/                       # Framework-agnostic types, config, and math (no Qt, no cv2 I/O)
+│   ├── types.py                #   Axis, Direction, Position, AxisCalibration, Resolution, ...
+│   ├── platform_info.py        #   Platform detection + per-OS defaults (PlatformProfile)
+│   ├── config.py               #   Resolutions, backend lists, default ports
+│   ├── stage_motion.py         #   plan_jog() — pure jog-planning math (unit-testable)
+│   └── autofocus.py            #   Autofocus search math: sweep planning, focus scoring, convergence
+├── hardware/                   # Hardware abstraction layer (no PyQt imports)
 │   ├── abstract.py             #   StageController / CameraController / SensorController ABCs
+│   ├── camera_names.py         #   Windows-only (pygrabber) camera name detection
 │   └── stage/
+│       ├── __init__.py         #   create_stage_controller() factory (real hardware + fallback)
 │       ├── arduino.py          #   ArduinoStageController
 │       ├── sangaboard.py       #   SangaboardStageController
 │       ├── mock.py             #   MockStageController (simulation)
-│       └── __init__.py         #   create_stage_controller() factory (handles fallback)
-└── ui/                        # PyQt5 presentation layer
-    ├── main_window.py          #   QMainWindow: composes panels + threads
+│       └── _position_tracking.py  # Shared position-bookkeeping mixin
+└── ui/                         # PyQt5 presentation layer
+    ├── main_window.py          #   QMainWindow: composes panels + threads, owns app state
     ├── panels/                 #   CameraPanel, CapturePanel, StagePanel (QGroupBox widgets)
-    └── threads/                #   CameraThread, StageMovementThread (QThread)
+    └── threads/                #   CameraThread, StageMovementThread, AutoFocusThread (QThread)
 ```
 
-**Dependency direction is one-way:** `ui` → `hardware`/`core`, `hardware` → `core`.
-`core` and `hardware` have zero PyQt imports, so the hardware layer (and the
-jog-planning math in particular) can be unit tested or reused headlessly.
+**Dependency direction is one-way:** `ui` → `hardware`/`core`, `hardware` →
+`core`. `core` and `hardware` have zero PyQt imports, so both layers can be
+unit tested or reused headlessly. See [the wiki](docs/WIKI.md) for why this
+matters and how to navigate it.
 
-### What changed vs. the original single-file version
-
-- Split the ~680-line `webcam_viewer.py` into UI panels (`ui/panels/`),
-  background threads (`ui/threads/`), and a thin `MainWindow` that just wires
-  them together.
-- Stage backends live one-per-file under `hardware/stage/`, sharing position
-  tracking via a small mixin (`_position_tracking.py`) instead of duplicating
-  the same `set_position`/step-delta logic three times.
-- `Direction` is now a proper `Enum` (was raw `'L'/'R'/'U'/'D'/'W'/'S'` strings
-  threaded through the codebase) and carries its own `axis`/`sign`.
-- The "connect to real hardware, fall back to simulation" logic that used to
-  live inline in `MainWindow.__init__` is now `hardware.stage.create_stage_controller()`,
-  independently testable and reusable.
-- Restored `move_steps()` as a concrete method on the `StageController` base
-  class — it was called throughout the original code but only the private
-  `_move_steps_raw` primitive was ever defined.
-- Speed→step-delay math was duplicated UI logic; it's now `core.stage_motion.plan_jog()`,
-  a pure function with no Qt or hardware dependency.
-- Added type hints throughout (`Position`, `AxisCalibration`, `Resolution`,
-  `CameraBackend`, etc. as dataclasses/NamedTuples instead of bare tuples/strings).
+---
 
 ## Cross-platform support (Windows + Debian-based Linux)
 
 All platform-specific decisions — default backend, default serial port,
 whether camera-name detection is available — are resolved by
-`core/platform_info.py` at **runtime**, not by maintaining separate code
-branches. Nothing else in the codebase calls `platform.system()` directly:
+`core/platform_info.py` at runtime; nothing else in the codebase calls
+`platform.system()` directly. `requirements/` is split into `base.txt`
+(shared), `windows.txt` (adds `pygrabber` for camera-name detection), and
+`linux.txt` (omits it, since it can't be installed on Linux).
 
-- `core/platform_info.py` — detects `Platform.WINDOWS` / `.LINUX` / `.MACOS`
-  and exposes a `PlatformProfile` (default backend index, default stage
-  port, `supports_camera_name_detection`).
-- `hardware/camera_names.py` — the Windows-only (`pygrabber`/DirectShow)
-  camera-name feature. On Linux it returns `supported=False` without ever
-  importing `pygrabber`, so that dependency doesn't need to exist there.
-- `requirements/` — split into `base.txt` (shared), `windows.txt` (adds
-  `pygrabber`), and `linux.txt` (omits it — it can't be installed on Linux).
-- `hardware/stage/arduino.py` / `sangaboard.py` default to `COM*` ports on
-  Windows and `/dev/tty*` on Linux via the same profile.
+---
 
 ## Installation (running from source)
 
@@ -76,17 +62,43 @@ python -m venv venv
 source venv/bin/activate   # Windows: venv\Scripts\activate
 
 # Windows:
-pip install -r ofm_webcam_gui/requirements/windows.txt
+pip install -r requirements/windows.txt
 # Linux:
-pip install -r ofm_webcam_gui/requirements/linux.txt
+pip install -r requirements/linux.txt
 ```
+
+### Linux: USB serial permissions (`dialout` group)
+
+On Debian-based Linux, USB serial devices (Sangaboard, Arduino) show up as
+`/dev/ttyACM*` or `/dev/ttyUSB*`, and by default only `root` and members
+of the `dialout` group can read/write them. If the stage fails to connect
+with a permissions error, add your user to that group:
+
+```bash
+sudo usermod -aG dialout $USER
+```
+
+**Log out and back in** (or reboot) for the new group membership to take
+effect — it isn't picked up by an already-open terminal session. Verify
+it worked with:
+
+```bash
+groups        # should list "dialout"
+ls -l /dev/ttyACM0   # or whichever port your stage is on
+```
+
+Without this, `create_stage_controller()` will fail to connect and the
+app will silently fall back to simulation mode rather than crash — see
+[Troubleshooting](#troubleshooting) below if that happens unexpectedly.
+
+---
 
 ## Usage
 
 ```bash
-python -m app.py
-python -m app.py --simulate        # no stage hardware required
-python -m app.py --log-level DEBUG
+python app.py
+python app.py --simulate        # no stage hardware required
+python app.py --log-level DEBUG
 ```
 
 Simulation mode is used automatically if no Sangaboard is detected on the
@@ -97,8 +109,12 @@ configured port, and can also be forced with `--simulate`.
 1. **Camera** — pick device index, backend, resolution, then Start Stream.
 2. **Snapshots & Recording** — PNG snapshots or MP4 recording, saved to
    `gallery/` by default (configurable via Browse).
-3. **Stage Control** — U/D/L/R for XY, W/S for Z (focus); step sizes, speed,
-   live position readout, and optional Auto-Level Z.
+3. **Stage Control** — U/D/L/R for XY, W/S for Z (focus); step sizes,
+   speed, live position readout, and **Autofocus** (coarse-to-fine search
+   around the current position — see [the wiki](docs/WIKI.md#core-autofocuspy--the-autofocus-search-as-pure-math)
+   for how it works).
+
+---
 
 ## Configuration
 
@@ -108,13 +124,25 @@ Default stage port: edit `DEFAULT_STAGE_PORT_WINDOWS` /
 the Arduino-based stage instead of Sangaboard, construct an
 `ArduinoStageController` in place of the call in `hardware/stage/__init__.py`.
 
+Autofocus tuning: `AutoFocusSettings()` in `ui/main_window.py`'s
+`_run_autofocus()` — widen `coarse_range_um` or raise `max_coarse_passes`
+if your setup regularly needs to search further than the defaults reach;
+tighten `fine_range_um`/`fine_step_um` for more precision at the cost of
+sweep time.
+
+---
+
 ## Hardware requirements
 
 - **Sangaboard** controller via USB (default `COM5` on Windows, `/dev/ttyACM0`
-  on Linux). Requires the `sangaboard` package.
+  on Linux). Requires the `sangaboard` package. On Linux, requires the user
+  to be in the `dialout` group (see above).
 - **Arduino stage** (alternative): default port `COM12`. Requires `pyserial`.
+  Same `dialout` group requirement on Linux.
 - **Camera name detection** (Windows only, optional): `pip install pygrabber`,
   then use the "Detect Camera Names" button.
+
+---
 
 ## Troubleshooting
 
@@ -122,12 +150,30 @@ the Arduino-based stage instead of Sangaboard, construct an
 Media Foundation to DirectShow (Windows); check no other app is using the
 camera; confirm drivers are installed.
 
-**Stage not connecting** — verify the Sangaboard is on the configured port;
-check Device Manager (Windows) / `/dev/tty*` (Linux); confirm `sangaboard` is
+**Stage not connecting / silently running in simulation mode on Linux** —
+almost always a `dialout` group / permissions issue; see
+[Linux: USB serial permissions](#linux-usb-serial-permissions-dialout-group)
+above. Also verify the Sangaboard is on the configured port; check
+`/dev/tty*` for the device; confirm `sangaboard` is installed; increase the
+connect timeout.
+
+**Stage not connecting (Windows)** — verify the Sangaboard is on the
+configured `COM*` port via Device Manager; confirm `sangaboard` is
 installed; increase the connect timeout.
 
-**Import errors** — activate the virtualenv; `pip install -r requirements.txt`;
+**Autofocus doesn't reach true focus in one click** — widen
+`coarse_range_um` / raise `max_coarse_passes` in `AutoFocusSettings()` if
+your typical starting offset is larger than the defaults search; if it
+seems to stop early on genuinely blurry frames, tune
+`has_weak_signal()`'s `min_relative_spread` in `core/autofocus.py`
+against your camera's actual noise floor. See
+[the wiki](docs/WIKI.md#core-autofocuspy--the-autofocus-search-as-pure-math)
+for how the search works.
+
+**Import errors** — activate the virtualenv; `pip install -r requirements/<platform>.txt`;
 confirm Python 3.7+.
+
+---
 
 ## License
 
@@ -135,4 +181,6 @@ See `LICENSE`. Provided as-is for laboratory and educational use.
 
 ## Contributors
 
-Pierre Padilla-Huamantinco, Caracara Tech
+- Joaquín Acosta Aguilera, Caracara Tech
+
+- Pierre Padilla-Huamantinco, Caracara Tech
