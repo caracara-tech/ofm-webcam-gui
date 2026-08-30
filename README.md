@@ -1,5 +1,14 @@
 # OFM Webcam Viewer
 
+[![Status](https://img.shields.io/badge/status-active-2E7D32)](../../)
+[![Python](https://img.shields.io/badge/python-3.11%2B-1565C0)](../../)
+[![PyQt5](https://img.shields.io/badge/UI-PyQt5-7B1FA2?logo=qt&logoColor=white)](../../)
+[![OpenCV](https://img.shields.io/badge/vision-OpenCV-C62828?logo=opencv&logoColor=white)](../../)
+[![Sangaboard](https://img.shields.io/badge/stage-Sangaboard-E65100)](../../)
+[![Arduino](https://img.shields.io/badge/stage-Arduino-00838F?logo=arduino&logoColor=white)](../../)
+[![Microscopy](https://img.shields.io/badge/application-Microscopy-F9A825)](../../)
+[![License](https://img.shields.io/badge/license-GPL--3.0-5D4037)](LICENSE)
+
 A PyQt5 + OpenCV application for streaming webcam feeds and capturing
 snapshots/recordings, with optional precision XYZ stage control and
 coarse-to-fine autofocus for microscopy setups (Sangaboard or Arduino-based
