@@ -2,7 +2,7 @@
 name = "ofm-webcam-gui"
 version = "0.1.0"
 description = "PyQt5 + OpenCV webcam viewer with optional precision-stage control"
-requires-python = ">=3.7"
+requires-python = ">=3.11"
 
 [tool.setuptools]
 packages = ["ofm_webcam_gui", "ofm_webcam_gui.core", "ofm_webcam_gui.hardware", "ofm_webcam_gui.hardware.stage", "ofm_webcam_gui.ui", "ofm_webcam_gui.ui.panels", "ofm_webcam_gui.ui.threads"]
