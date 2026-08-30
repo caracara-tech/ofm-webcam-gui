@@ -187,7 +187,7 @@ against your camera's actual noise floor. See
 for how the search works.
 
 **Import errors** —> activate the virtualenv; `pip install -r requirements/<platform>.txt`;
-confirm Python 3.7+.
+confirm Python 3.11+.
 
 ---
 
