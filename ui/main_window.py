@@ -22,12 +22,14 @@ from PyQt5.QtWidgets import (
 
 from core.autofocus import AutoFocusSettings
 from core.config import DEFAULT_OUTPUT_DIR, SANGABOARD_MAX_STEPS_PER_SEC
+from core.overlays import draw_grid, draw_scale_bar
 from core.stage_motion import plan_jog
 from core.types import Axis, Direction, StageMotionSettings
 from hardware.camera_names import detect_camera_names
 from hardware.stage import SangaboardStageController, StageInitResult, create_stage_controller
 from .panels.camera_panel import CameraPanel
 from .panels.capture_panel import CapturePanel
+from .panels.display_panel import DisplayPanel
 from .panels.stage_panel import StagePanel
 from .threads.autofocus_thread import AutoFocusThread
 from .threads.camera_thread import CameraThread
@@ -127,6 +129,9 @@ class MainWindow(QMainWindow):
         if self.stage is None:
             self.stage_panel.set_enabled_all(False)
         controls_layout.addWidget(self.stage_panel)
+
+        self.display_panel = DisplayPanel()
+        controls_layout.addWidget(self.display_panel)
         controls_layout.addStretch()
 
         self.status = QStatusBar()
@@ -204,11 +209,17 @@ class MainWindow(QMainWindow):
         if self.video_writer is not None:
             self.video_writer.write(recorded_frame)
 
-        # The blinking "REC" dot is a live-preview cue only - it's overlaid
-        # after writing so it never ends up baked into the saved video.
+        # Grid and the blinking "REC" dot are live-preview aids only - both
+        # are overlaid after writing so neither ends up baked into the
+        # saved video/snapshot (the scale bar, by contrast, is meaningful
+        # measurement data and *is* baked in - see _draw_overlays).
         display_frame = recorded_frame
-        if self.video_writer is not None and self._recording_blink_on:
+        needs_copy = self.display_panel.show_grid or (self.video_writer is not None and self._recording_blink_on)
+        if needs_copy:
             display_frame = recorded_frame.copy()
+        if self.display_panel.show_grid:
+            display_frame = draw_grid(display_frame, self.display_panel.grid_spacing_px)
+        if self.video_writer is not None and self._recording_blink_on:
             cv2.circle(display_frame, (24, 24), 9, (0, 0, 255), -1, cv2.LINE_AA)
             cv2.putText(
                 display_frame, "REC", (40, 32),
@@ -223,6 +234,8 @@ class MainWindow(QMainWindow):
         self.status.showMessage(f"Frame {self.frame_count} | {fps:.1f} fps")
 
     def _draw_overlays(self, frame: np.ndarray) -> np.ndarray:
+        if self.display_panel.show_scale_bar:
+            frame = draw_scale_bar(frame, self.display_panel.um_per_pixel_override)
         if self.capture_panel.burn_timestamp:
             ts = datetime.now().strftime("%Y-%m-%d %H:%M:%S.%f")[:-3]
             cv2.putText(

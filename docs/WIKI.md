@@ -29,7 +29,7 @@ file's function signatures become self-explanatory instead of mysterious.
 
 ### 2. Read `core/` in full before touching `hardware/` or `ui/`
 
-`core/` has **zero PyQt or hardware imports** — every function is pure
+`core/` has **zero PyQt or hardware imports**, every function is pure
 input-in, output-out logic you can run in a plain Python REPL. You should check them
 in this order:
 
@@ -295,6 +295,49 @@ in real-world distance on every different piece of hardware.
   sweep whose winner sits at the very edge of the window it searched,
   meaning the true peak may lie further out in that direction.
 
+### `core/overlays.py` — preview-overlay drawing (grid + scale bar)
+
+Pure input-frame-in/output-frame-out functions, same style as
+`core/autofocus.py` - no Qt, no hardware, just `cv2`/`numpy` array
+operations, so the geometry is unit-testable without a running GUI.
+
+The scale bar defaults to **pixel units** (e.g. `"100 px"`), fully
+automatic and computed straight from the frame's own dimensions - no
+calibration needed. It only switches to physical units (e.g. `"50 um"`)
+if the caller supplies a calibrated `um_per_pixel` value; there's no way
+to derive real-world size from pixel counts alone, so the automatic
+default is honest about what it can and can't know.
+
+- **`grid_line_positions(size_px, spacing_px) -> List[int]`** - the 1-D
+  line positions for one axis of the alignment grid; pure geometry,
+  separated from the actual `cv2.line()` calls so it can be tested alone.
+- **`draw_grid(frame, spacing_px, color, thickness) -> np.ndarray`** -
+  draws an evenly-spaced alignment grid over a frame, in place.
+- **`nice_scale_bar_length_px(frame_width_px, target_fraction) -> int`**
+  / **`nice_scale_bar_length_um(um_per_pixel, frame_width_px, target_fraction) -> float`**
+  - pick a "nice" round length (1/2/5 x a power of ten, e.g. `50` rather
+  than `43.7`) whose on-screen width is close to `target_fraction` of the
+  frame width, for the pixel and physical scale bars respectively. Both
+  share the `_nice_round_number()` rounding logic.
+- **`draw_scale_bar(frame, um_per_pixel=None, ...) -> np.ndarray`** -
+  draws the bar (with end ticks) and its text label in the frame's
+  bottom-right corner. `um_per_pixel=None` (the default) draws the
+  automatic pixel-count bar; a positive `um_per_pixel` draws a physical
+  bar instead. Labels are ASCII (`"50 um"`, not a literal micro-sign)
+  since OpenCV's built-in Hershey fonts don't reliably render non-ASCII
+  glyphs.
+
+### `core/scale_calibration.py` — optional physical scale override
+
+- **`validate_um_per_pixel(value) -> float`** - validates a user-entered
+  µm/pixel override value, raising `ValueError` on a non-positive input.
+  This is *optional*: the scale bar's automatic default needs it not at
+  all. It exists for someone who has an actual reference measurement
+  (e.g. imaged a stage micrometer once) and wants the bar in real units.
+  This setup's objective has no zoom and Z only refocuses by moving the
+  sample, so if supplied, it's a single fixed constant - not a function
+  of Z.
+
 ### `hardware/abstract.py` — the hardware contract
 
 - **`StageController`** (ABC) —> the interface every stage backend must
@@ -380,17 +423,38 @@ backends, instead of each reimplementing the same bookkeeping.
   readout, Autofocus button; exposes `update_position_display()`,
   `set_jog_enabled()`, `set_enabled_all()` (used to disable controls
   while a move or autofocus sweep is in flight).
+- **`DisplayPanel`** - preview-overlay controls: grid toggle + spacing,
+  scale bar toggle, and a collapsed-by-default **Advanced** section
+  holding an optional physical `um_per_pixel` override (`None` unless the
+  user explicitly enables it). Like the other panels, it only collects
+  input and exposes properties (`show_grid`, `show_scale_bar`,
+  `um_per_pixel_override`); the actual drawing lives in
+  `core/overlays.py`. The advanced section starts hidden via
+  `self.advanced_frame.setVisible(False)`, toggled by a `QToolButton`
+  rather than a full custom collapsible-group-box widget - simplest
+  thing that reads clearly as "click to expand."
 
 ### `ui/main_window.py` — composition root
 
 Owns the panels and threads and wires them together via signals; doesn't
 contain camera/stage/autofocus *logic* itself. Notable methods:
 
-- **`_build_ui()`** —> assembles panels into the main layout.
-- **`_start_stream()` / `_stop_stream()`** —> start/stop `CameraThread`.
-- **`_on_frame(frame, fps)`** —> receives frames from `CameraThread`,
-  updates the preview, forwards frames to any in-progress recording.
-- **`_on_jog_requested(direction)`** —> calls `plan_jog()`, then queues
+- **`_build_ui()`** -> assembles panels into the main layout.
+- **`_start_stream()` / `_stop_stream()`** -> start/stop `CameraThread`.
+- **`_on_frame(frame, fps)`** -> receives frames from `CameraThread`. Calls
+  `_draw_overlays()` for whatever should be baked into the saved video
+  (scale bar, timestamp) *before* writing to `VideoWriter`, then applies`
+  preview-only extras, the alignment grid and the blinking "REC"
+  indicator, to a separate copy used only for the on-screen `QPixmap`,
+  so neither ends up in the saved file.
+- **`_draw_overlays(frame)`** -> overlays that *are* meant to be part of
+  the saved data: the scale bar (via `core/overlays.py::draw_scale_bar`,
+  passed `DisplayPanel.um_per_pixel_override` - `None` unless the user
+  turned on the Advanced override, in which case it's the physical bar
+  instead of the automatic pixel one) and the burned-in timestamp. Used
+  by both the recording path (in `_on_frame`) and snapshot saving, so a
+  saved PNG and a saved video frame get identical treatment.
+- **`_on_jog_requested(direction)`** -> calls `plan_jog()`, then queues
   the move on `StageMovementThread`.
 - **`_run_autofocus()`** —> constructs and starts an `AutoFocusThread`.
 - **`_on_autofocus_finished(message)`** —> cleans up the thread safely
