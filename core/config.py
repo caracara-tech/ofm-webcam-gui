@@ -13,6 +13,7 @@ picks a *default* index).
 
 from __future__ import annotations
 
+import sys
 from pathlib import Path
 
 import cv2
@@ -21,7 +22,12 @@ from .platform_info import CURRENT_PLATFORM, Platform, current_profile
 from .types import CameraBackend, Resolution
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
-DEFAULT_OUTPUT_DIR = PROJECT_ROOT / "gallery"
+if getattr(sys, "frozen", False):
+    # PyInstaller: __file__ lives in a temp dir that is deleted on exit (onefile),
+    # and /usr/bin or Program Files is not writable -> save under the user's home.
+    DEFAULT_OUTPUT_DIR = Path.home() / "Pictures" / "ofm-webcam-gui"
+else:
+    DEFAULT_OUTPUT_DIR = PROJECT_ROOT / "gallery"
 
 RESOLUTIONS: list[Resolution] = [
     Resolution("1280 x 720", 1280, 720),
