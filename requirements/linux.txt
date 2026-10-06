@@ -1,0 +1,9 @@
+-r base.txt
+
+# Sangaboard stage controller
+sangaboard>=0.1.0
+
+# NOTE: pygrabber is intentionally NOT listed here — it is a Windows-only
+# DirectShow binding and cannot be installed on Linux. Camera name
+# detection is a no-op on Linux (see hardware/camera_names.py /
+# core/platform_info.py: supports_camera_name_detection=False).
