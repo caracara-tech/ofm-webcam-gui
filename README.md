@@ -115,6 +115,7 @@ python app.py --mode camera
 python app.py --mode simulation
 python app.py --stage-port COM5     # force the stage's serial port
 python app.py --log-level DEBUG
+python app.py --help              # modes, features and examples
 ```
 
 On launch you choose one of three modes (or skip the dialog with `--mode`):
