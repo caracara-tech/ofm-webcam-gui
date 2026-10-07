@@ -48,9 +48,11 @@ shortest and has no real serial I/O to distract you, to see how that
 contract gets fulfilled. You don't need to read `arduino.py` and
 `sangaboard.py` in detail on a first pass; they follow the same shape.
 
-Then read `hardware/stage/__init__.py`'s `create_stage_controller()`,
-one function, but it's the answer to "how does the app decide whether
-it's talking to real hardware or a simulation?"
+Then read `ui/startup.py`'s `resolve_session()` and
+`hardware/stage/__init__.py`'s `connect_real_stage()` / `create_mock_stage()`.
+Together they answer "how does the app decide whether it's talking to
+real hardware, a simulation, or no stage at all?" (the user picks an
+`AppMode` at launch; nothing is auto-detected or silently swapped).
 
 ### 4. Read `ui/threads/` before `ui/panels/` or `ui/main_window.py`
 
@@ -83,12 +85,12 @@ faster for building a mental model than reading files in isolation:
 
 - **"What happens when I click a Z-jog button?"** →
   `ui/panels/stage_panel.py` (emits `jog_requested`) →
-  `ui/main_window.py::_on_jog_requested` →
+  `ui/stage_module.py::StageModule._on_jog_requested` →
   `core/stage_motion.py::plan_jog` (pure math) →
   `ui/threads/stage_thread.py::StageMovementThread.add_movement` →
   `hardware/stage/sangaboard.py::_move_steps_raw` (actual serial I/O).
 - **"What happens when I click Autofocus?"** →
-  `ui/main_window.py::_run_autofocus` →
+  `ui/stage_module.py::StageModule._run_autofocus` →
   `ui/threads/autofocus_thread.py::AutoFocusThread.run` →
   `core/autofocus.py::plan_autofocus_sweep` / `focus_score` / `best_offset`
   (pure math) → back to the stage controller for the actual moves.
@@ -137,18 +139,18 @@ This is the same idea as a device driver in an operating system, or
 `Comparable`/interfaces in typed languages generally: **program to an
 interface, not an implementation.**
 
-### The Factory pattern + graceful hardware fallback
+### Explicit modes, optional stage module, no silent fallback
 
-`hardware/stage/__init__.py::create_stage_controller()` is a small
-*factory function*: instead of `MainWindow` deciding "try to import
-Sangaboard's driver, try to open the port, catch the exception, fall
-back to a mock" inline, that whole policy lives in one function that
-returns a ready-to-use controller (real or simulated) plus metadata
-about which one you got and why. `MainWindow` just calls it and doesn't
-need to know stage brands exist. This also means the fallback logic
-itself is testable in isolation, and reusable if a second entry point
-(a CLI tool, a test harness) ever needs the same "try real hardware,
-fall back to simulation" behavior.
+The user picks an `AppMode` at launch (`core/app_mode.py`): Camera +
+Stage, Camera only, or Simulation. `ui/startup.py` turns that choice into
+a `Session(mode, stage)`: a real stage via `connect_real_stage()` (which
+*raises* `StageCommunicationError` with a user-readable message if the
+board can't be reached), a `MockStageController`, or `None`.
+`MainWindow` receives the result and builds `StageModule` only if there
+is a stage, so camera-only mode contains no stage code paths to guard.
+Failures are reported, never hidden: at startup the user gets
+Retry / Choose another mode / Quit, and at runtime `StageModule` shows an
+error dialog once and disables the stage controls.
 
 ### Composition over inheritance, and a thin `MainWindow`
 
@@ -350,13 +352,21 @@ default is honest about what it can and can't know.
   contracts for camera/sensor hardware (arm, exposure, gain, ROI, frame
   acquisition), used for non-webcam camera hardware if/when added.
 
-### `hardware/stage/__init__.py` — hardware selection policy
+### `hardware/stage/__init__.py` — stage factories
 
-- **`create_stage_controller(*, simulate, port, timeout) -> StageInitResult`**
-  —> the one place that decides real-vs-simulated hardware: tries a real
-  `SangaboardStageController` connection, transparently falls back to
-  `MockStageController` if it can't connect (or if simulation was
-  explicitly requested), and reports which happened.
+- **`connect_real_stage(port, timeout) -> SangaboardStageController`**
+  —> connects to a real Sangaboard (platform default port first, then an
+  automatic port scan) and raises `StageCommunicationError` on failure.
+  Never falls back to simulation.
+- **`create_mock_stage() -> MockStageController`** —> the simulated stage.
+
+### `ui/startup.py` and `ui/stage_module.py`
+
+- **`ModeDialog` / `resolve_session()`** —> mode picker and the
+  connect-or-ask-again loop that runs before `MainWindow` exists.
+- **`StageModule`** —> owns the stage controller, `StageMovementThread`,
+  position timer, `StagePanel`, and the jog/autofocus handlers; shows the
+  "connection lost" error. Not created in camera-only mode.
 
 ### `hardware/stage/{sangaboard,arduino,mock}.py` — concrete backends
 
@@ -454,17 +464,19 @@ contain camera/stage/autofocus *logic* itself. Notable methods:
   instead of the automatic pixel one) and the burned-in timestamp. Used
   by both the recording path (in `_on_frame`) and snapshot saving, so a
   saved PNG and a saved video frame get identical treatment.
-- **`_on_jog_requested(direction)`** -> calls `plan_jog()`, then queues
-  the move on `StageMovementThread`.
-- **`_run_autofocus()`** —> constructs and starts an `AutoFocusThread`.
-- **`_on_autofocus_finished(message)`** —> cleans up the thread safely
-  (see [threading model](#threading-model-background-work-never-blocks-the-ui)
-  above) and updates the status bar/position display.
+- **`_on_error(kind, message)`** —> camera failures are shown in the image
+  box ("Camera not detected" / "Camera disconnected"), not in a modal.
+- **`StageModule._on_jog_requested(direction)`** -> calls `plan_jog()`, then
+  queues the move on `StageMovementThread`; `_run_autofocus()` constructs and
+  starts an `AutoFocusThread`; `_on_autofocus_finished(message)` cleans the
+  thread up safely (see
+  [threading model](#threading-model-background-work-never-blocks-the-ui)).
 - **`closeEvent()`** —> stops all threads and disconnects hardware before
   the window closes.
 
 ### `app.py` — entry point
 
-- **`parse_args(argv)`** —> CLI flags: `--simulate`, `--log-level`.
-- **`main()`** —> sets up logging, constructs `QApplication` and
-  `MainWindow`, runs the Qt event loop.
+- **`parse_args(argv)`** —> CLI flags: `--mode`, `--stage-port`, `--log-level` (`--simulate` kept as an alias).
+- **`main()`** —> sets up logging, constructs `QApplication`, resolves the
+  session (mode dialog / stage connection), builds `MainWindow`, runs the
+  Qt event loop.

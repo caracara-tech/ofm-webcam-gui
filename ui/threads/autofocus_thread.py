@@ -25,6 +25,7 @@ from core.autofocus import (
 )
 from core.types import Axis, Direction
 from hardware.abstract import StageController
+from hardware.errors import StageCommunicationError
 
 
 class AutoFocusThread(QThread):
@@ -44,6 +45,7 @@ class AutoFocusThread(QThread):
 
     progress = pyqtSignal(int, int)  # (current_step, total_steps)
     finished_focus = pyqtSignal(str)  # human-readable result/status message
+    stage_failed = pyqtSignal(str)  # emitted (before finished_focus) if the stage stops responding
 
     def __init__(
         self,
@@ -148,5 +150,8 @@ class AutoFocusThread(QThread):
                 f"Auto-focus complete (sharpness {best_score:.1f}, "
                 f"{coarse_passes} coarse pass{'es' if coarse_passes != 1 else ''} + fine pass)"
             )
+        except StageCommunicationError as e:
+            self.stage_failed.emit(str(e))
+            self.finished_focus.emit("Auto-focus aborted: lost communication with the stage")
         except Exception as e:
             self.finished_focus.emit(f"Auto-focus error: {e}")

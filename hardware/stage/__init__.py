@@ -1,16 +1,16 @@
 """
-Stage controller implementations, plus a factory that encapsulates the
-"try real hardware, fall back to simulation" policy so UI code doesn't
-have to know about specific controller classes.
+Stage controller implementations, plus two small factories so UI code
+doesn't have to know about specific controller classes:
+`connect_real_stage()` (raises on failure) and `create_mock_stage()`.
 """
 
 from __future__ import annotations
 
 import logging
-from dataclasses import dataclass
 from typing import Optional
 
 from hardware.abstract import StageController
+from hardware.errors import StageCommunicationError
 
 from .arduino import ArduinoStageController
 from .mock import MockStageController
@@ -22,40 +22,27 @@ __all__ = [
     "ArduinoStageController",
     "MockStageController",
     "SangaboardStageController",
+    "StageCommunicationError",
     "StageController",
-    "StageInitResult",
-    "create_stage_controller",
+    "connect_real_stage",
+    "create_mock_stage",
 ]
 
 
-@dataclass
-class StageInitResult:
-    controller: StageController
-    simulation_mode: bool
-    simulation_reason: Optional[str]  # "user requested" | "not detected" | None
+def create_mock_stage() -> MockStageController:
+    """A simulated stage: always available, nothing physical moves."""
+    controller = MockStageController()
+    controller.connect()
+    return controller
 
 
-def create_stage_controller(*, simulate: bool, port: Optional[str] = None, timeout: float = 2) -> StageInitResult:
-    """Create and connect a stage controller.
+def connect_real_stage(port: Optional[str] = None, timeout: float = 2) -> SangaboardStageController:
+    """Connect to a real Sangaboard stage.
 
-    If `simulate` is True, always returns a MockStageController.
-    Otherwise, tries a SangaboardStageController and transparently falls
-    back to simulation if it can't connect.
+    Raises StageCommunicationError (with a user-readable message) if it
+    cannot be reached. There is deliberately no silent fallback to
+    simulation here: the caller decides what to do about a failure.
     """
-    if simulate:
-        logger.info("Starting in SIMULATION mode (user requested)")
-        controller = MockStageController()
-        controller.connect()
-        return StageInitResult(controller, simulation_mode=True, simulation_reason="user requested")
-
-    try:
-        controller: StageController = SangaboardStageController(port=port, timeout=timeout)
-        controller.connect()
-        if not controller.is_connected():
-            raise RuntimeError("Connection failed")
-        return StageInitResult(controller, simulation_mode=False, simulation_reason=None)
-    except Exception as e:
-        logger.warning("Could not connect to stage: %s. Falling back to SIMULATION mode.", e)
-        mock = MockStageController()
-        mock.connect()
-        return StageInitResult(mock, simulation_mode=True, simulation_reason="not detected")
+    controller = SangaboardStageController(port=port, timeout=timeout)
+    controller.connect()
+    return controller

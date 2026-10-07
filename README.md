@@ -24,10 +24,11 @@ stages).
 
 ```
 ofm-webcam-gui/
-├── app.py                      # Entry point: python app.py [--simulate] [--log-level DEBUG]
+├── app.py                      # Entry point: python app.py [--mode camera-stage|camera|simulation] [--stage-port PORT] [--log-level DEBUG]
 ├── core/                       # Framework-agnostic types, config, and math (no Qt, no cv2 I/O)
 │   ├── types.py                #   Axis, Direction, Position, AxisCalibration, Resolution, ...
 │   ├── platform_info.py        #   Platform detection + per-OS defaults (PlatformProfile)
+│   ├── app_mode.py             #   AppMode enum: camera-stage / camera-only / simulation
 │   ├── config.py               #   Resolutions, backend lists, default ports
 │   ├── stage_motion.py         #   plan_jog(), pure jog-planning math (unit-testable)
 │   ├── autofocus.py            #   Autofocus search math: sweep planning, focus scoring, convergence
@@ -36,8 +37,9 @@ ofm-webcam-gui/
 ├── hardware/                   # Hardware abstraction layer (no PyQt imports)
 │   ├── abstract.py             #   StageController / CameraController / SensorController ABCs
 │   ├── camera_names.py         #   Windows-only (pygrabber) camera name detection
+│   ├── errors.py               #   StageCommunicationError
 │   └── stage/
-│       ├── __init__.py         #   create_stage_controller() factory (real hardware + fallback)
+│       ├── __init__.py         #   connect_real_stage() (raises on failure) / create_mock_stage()
 │       ├── arduino.py          #   ArduinoStageController
 │       ├── sangaboard.py       #   SangaboardStageController
 │       ├── mock.py             #   MockStageController (simulation)
@@ -98,22 +100,34 @@ groups        # should list "dialout"
 ls -l /dev/ttyACM0   # or whichever port your stage is on
 ```
 
-Without this, `create_stage_controller()` will fail to connect and the
-app will silently fall back to simulation mode rather than crash, see
-[Troubleshooting](#troubleshooting) below if that happens unexpectedly.
+Without this, Camera + Stage mode cannot open the port and shows an explicit
+error at startup (with a hint about this group); see
+[Troubleshooting](#troubleshooting) below.
 
 ---
 
 ## Usage
 
 ```bash
-python app.py
-python app.py --simulate        # no stage hardware required
+python app.py                       # asks which mode to start in
+python app.py --mode camera-stage   # skip the dialog
+python app.py --mode camera
+python app.py --mode simulation
+python app.py --stage-port COM5     # force the stage's serial port
 python app.py --log-level DEBUG
 ```
 
-Simulation mode is used automatically if no Sangaboard is detected on the
-configured port, and can also be forced with `--simulate`.
+On launch you choose one of three modes (or skip the dialog with `--mode`):
+
+| Mode | For | Stage controls | Behaviour |
+|---|---|---|---|
+| **Camera + Stage** | Full motorized microscope | Shown, real hardware | If the stage can't be reached at startup you get an error with *Retry / Choose another mode / Quit*. If it stops responding while running, an explicit error is shown and the stage controls are disabled. |
+| **Camera only** | Device without motors | Hidden | Camera device index/backend/resolution, snapshots and recording only. |
+| **Simulation** | No hardware at all | Shown, simulated stage | Nothing physical moves; title shows `[SIMULATION]`. |
+
+In every mode, if the camera can't be opened the image box says
+**Camera not detected**; change the device index and press Start Stream
+again. `--simulate` still works as an alias for `--mode simulation`.
 
 ### Controls
 
@@ -138,12 +152,12 @@ configured port, and can also be forced with `--simulate`.
 
 Default stage port: edit `DEFAULT_STAGE_PORT_WINDOWS` /
 `DEFAULT_STAGE_PORT_LINUX` in `core/config.py`, or pass `port=` to
-`create_stage_controller()` / `SangaboardStageController()` directly. To use
+`connect_real_stage()` / `SangaboardStageController()` directly, or use `--stage-port`. To use
 the Arduino-based stage instead of Sangaboard, construct an
 `ArduinoStageController` in place of the call in `hardware/stage/__init__.py`.
 
 Autofocus tuning: `AutoFocusSettings()` in `ui/main_window.py`'s
-`_run_autofocus()`, widen `coarse_range_um` or raise `max_coarse_passes`
+`StageModule._run_autofocus()` in `ui/stage_module.py`, widen `coarse_range_um` or raise `max_coarse_passes`
 if your setup regularly needs to search further than the defaults reach;
 tighten `fine_range_um`/`fine_step_um` for more precision at the cost of
 sweep time.
@@ -175,7 +189,7 @@ framing and relative comparisons.
 Media Foundation to DirectShow (Windows); check no other app is using the
 camera; confirm drivers are installed.
 
-**Stage not connecting / silently running in simulation mode on Linux** —>
+**Stage not connecting on Linux (error at startup)** —>
 almost always a `dialout` group / permissions issue; see
 [Linux: USB serial permissions](#linux-usb-serial-permissions-dialout-group)
 above. Also verify the Sangaboard is on the configured port; check
