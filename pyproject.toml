@@ -1,6 +1,6 @@
 [project]
 name = "ofm-webcam-gui"
-version = "0.1.0"
+dynamic = ["version"]  # defined once, in core/version.py
 description = "PyQt5 + OpenCV webcam viewer with optional precision-stage control"
 requires-python = ">=3.11"
 dependencies = [
@@ -26,6 +26,9 @@ build-backend = "setuptools.build_meta"
 [tool.setuptools]
 py-modules = ["app"]
 packages = ["core", "hardware", "hardware.stage", "ui", "ui.panels", "ui.threads"]
+
+[tool.setuptools.dynamic]
+version = {attr = "core.version.__version__"}
 
 [tool.setuptools.package-data]
 core = ["locales/*/LC_MESSAGES/*.mo"]

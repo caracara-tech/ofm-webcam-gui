@@ -10,6 +10,10 @@ built the way it is, not just how to run it.
 - [Software engineering concepts used in this project](#software-engineering-concepts-used-in-this-project)
 - [Key functions by module](#key-functions-by-module)
 
+Related guides: [BUILDING.md](BUILDING.md) (executables and packaging),
+[TRANSLATING.md](TRANSLATING.md) (interface languages) and the
+[README](../README.md) (install and run).
+
 ---
 
 ## How to explore this codebase without getting lost
@@ -76,7 +80,7 @@ By now every piece it wires together is already familiar, so
 `MainWindow` reads as "plumbing", connecting panel signals to thread
 slots, rather than a wall of unfamiliar logic. This is intentional: a
 thin `MainWindow` is a *goal* of the architecture, not an accident (see
-[Composition over inheritance](#composition-over-inheritance-and-a-thin-main_window) below).
+[Composition over inheritance](#composition-over-inheritance-and-a-thin-mainwindow) below).
 
 ### If you just want to trace one feature end-to-end
 
@@ -107,7 +111,8 @@ just a project changelog.
 
 The codebase is split into three layers, `core`, `hardware` and `ui`, with
 a strict rule: **a layer may only import from layers below it.**
-`core` imports nothing project-specific. `hardware` may import `core` but
+`core` imports nothing project-specific. `hardware` may import `core` (for
+example `core.i18n`, so hardware error messages can be translated) but
 never `ui`. `ui` may import both. This is why, for example, you can run
 `plan_jog()` from `core/stage_motion.py` in a bare Python shell with no
 GUI or serial port anywhere near your machine, it has nothing to import
@@ -414,6 +419,10 @@ backends, instead of each reimplementing the same bookkeeping.
   the capture loop itself off the GUI thread.
 - **`_open_capture()`** —> builds the `cv2.VideoCapture` with the chosen
   backend/resolution.
+- **`error_occurred(kind, message)`** —> emitted when the camera can't be
+  opened (`not_detected`), stops delivering frames (`lost`), or fails
+  otherwise (`other`); `MainWindow._on_error()` turns the kind into the
+  headline shown in the image box.
 - **`stop()`** —> signals the loop to exit and releases the device.
 
 ### `ui/threads/stage_thread.py` — queued stage moves
@@ -423,6 +432,9 @@ backends, instead of each reimplementing the same bookkeeping.
   GUI thread.
 - **`run()`** —> processes the queue, issuing moves via the connected
   `StageController` and reporting completion back via signals.
+- **`movement_complete(message, direction)`** / **`movement_failed(message,
+  direction)`** —> success vs. a `StageCommunicationError`; the latter makes
+  `StageModule` show the error dialog and disable the stage controls.
 - **`stop()`** —> drains/stops the queue cleanly.
 
 ### `ui/threads/autofocus_thread.py` — the autofocus sweep, run against real hardware
@@ -430,7 +442,9 @@ backends, instead of each reimplementing the same bookkeeping.
 - **`AutoFocusThread.run()`** —> orchestrates the coarse-to-fine search
   described above: repeated coarse passes (expanding the search window
   on an edge-hit or a weak-signal result) followed by one fine pass,
-  reporting progress and a final result message via signals.
+  reporting progress and a final result message via signals. If the stage
+  stops answering it emits `stage_failed` (handled like a failed jog) before
+  the final message.
 - **`_run_one_sweep(plan)`** —> executes one sweep (coarse or fine): moves
   to the start of the window, samples+scores a frame at each position,
   returns to the best-scoring one.

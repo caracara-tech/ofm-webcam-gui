@@ -88,6 +88,15 @@ care:
 | grid | cuadrícula |
 | timestamp | marca de tiempo |
 
+## Troubleshooting
+
+- **A language is missing from the selector.** Its compiled `.mo` file must
+  exist in `core/locales/<code>/LC_MESSAGES/`. Run `python tools/i18n.py compile`.
+- **Edits to a `.po` file have no effect.** The app loads the compiled `.mo`,
+  not the `.po`: run `compile` after every edit. `check` reports a stale `.mo`.
+- **The executable shows an old translation.** Rebuild it after `compile`; see
+  [BUILDING.md](BUILDING.md).
+
 ## For developers: marking strings
 
 ```python

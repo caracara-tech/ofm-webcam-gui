@@ -21,8 +21,9 @@ from core.app_mode import AppMode
 from core.config import DEFAULT_OUTPUT_DIR
 from core.i18n import available_languages, match_language, resolve_language
 
-# "python app.py" from source, the executable's own name when frozen by PyInstaller.
-RUN_CMD = Path(sys.executable).name if getattr(sys, "frozen", False) else "python app.py"
+# How the user started us: "python app.py" from a source checkout, otherwise the
+# command's own name (a PyInstaller executable, or the pip-installed `ofm-webcam-gui`).
+RUN_CMD = "python app.py" if Path(sys.argv[0]).name == "app.py" else Path(sys.argv[0]).name
 
 DESCRIPTION = """\
 OFM Webcam Viewer: a desktop GUI for OpenFlexure-style microscopes.

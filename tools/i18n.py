@@ -22,7 +22,6 @@ import argparse
 import io
 import re
 import sys
-import tomllib
 from gettext import GNUTranslations
 from pathlib import Path
 
@@ -56,8 +55,8 @@ def _babel():
 
 
 def _version() -> str:
-    with open(ROOT / "pyproject.toml", "rb") as f:
-        return tomllib.load(f)["project"]["version"]
+    match = re.search(r'__version__\s*=\s*"([^"]+)"', (ROOT / "core" / "version.py").read_text("utf-8"))
+    return match.group(1) if match else "0"
 
 
 def _po_files() -> list[Path]:

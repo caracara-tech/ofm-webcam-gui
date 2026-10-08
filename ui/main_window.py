@@ -24,6 +24,7 @@ from core.app_mode import AppMode
 from core.config import DEFAULT_OUTPUT_DIR
 from core.i18n import _
 from core.overlays import draw_grid, draw_scale_bar
+from core.version import __version__
 from hardware.abstract import StageController
 from hardware.camera_names import detect_camera_names
 from .panels.camera_panel import CameraPanel
@@ -34,7 +35,7 @@ from .threads.camera_thread import ERR_LOST, ERR_NOT_DETECTED, CameraThread
 
 logger = logging.getLogger(__name__)
 
-APP_TITLE = "OFM Webcam Viewer v0.1"
+APP_TITLE = "OFM Webcam Viewer v" + ".".join(__version__.split(".")[:2])  # e.g. "v0.1"
 SNAPSHOT_FLASH_MS = 120
 RECORDING_BLINK_INTERVAL_MS = 500
 

@@ -22,12 +22,21 @@ from .platform_info import CURRENT_PLATFORM, Platform, current_profile
 from .types import CameraBackend, Resolution
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
-if getattr(sys, "frozen", False):
-    # PyInstaller: __file__ lives in a temp dir that is deleted on exit (onefile),
-    # and /usr/bin or Program Files is not writable -> save under the user's home.
-    DEFAULT_OUTPUT_DIR = Path.home() / "Pictures" / "ofm-webcam-gui"
-else:
-    DEFAULT_OUTPUT_DIR = PROJECT_ROOT / "gallery"
+
+
+def _default_output_dir() -> Path:
+    """Where snapshots/recordings go unless the user picks another folder.
+
+    Running from a source checkout: <repo>/gallery (next to the code). Anywhere
+    else (a PyInstaller executable, whose files live in a temp dir that is
+    deleted on exit, or a pip-installed copy under site-packages, which is not
+    meant to be written to): the user's Pictures folder.
+    """
+    from_source_checkout = not getattr(sys, "frozen", False) and (PROJECT_ROOT / "pyproject.toml").is_file()
+    return PROJECT_ROOT / "gallery" if from_source_checkout else Path.home() / "Pictures" / "ofm-webcam-gui"
+
+
+DEFAULT_OUTPUT_DIR = _default_output_dir()
 
 RESOLUTIONS: list[Resolution] = [
     Resolution("1280 x 720", 1280, 720),
