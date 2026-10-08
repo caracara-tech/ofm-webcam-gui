@@ -22,6 +22,7 @@ from PyQt5.QtWidgets import (
 
 from core.app_mode import AppMode
 from core.config import DEFAULT_OUTPUT_DIR
+from core.i18n import _
 from core.overlays import draw_grid, draw_scale_bar
 from hardware.abstract import StageController
 from hardware.camera_names import detect_camera_names
@@ -60,11 +61,11 @@ class MainWindow(QMainWindow):
         self.stage_module: Optional[StageModule] = None
 
         title_suffix = {
-            AppMode.CAMERA_STAGE: " - Camera + Stage",
-            AppMode.CAMERA_ONLY: " - Camera",
-            AppMode.SIMULATION: " - SIMULATION",
+            AppMode.CAMERA_STAGE: _("Camera + Stage"),
+            AppMode.CAMERA_ONLY: _("Camera"),
+            AppMode.SIMULATION: _("SIMULATION"),
         }[mode]
-        self.setWindowTitle(APP_TITLE + title_suffix)
+        self.setWindowTitle(f"{APP_TITLE} - {title_suffix}")
         self.resize(900, 700)
 
         self._build_ui(stage)
@@ -81,7 +82,7 @@ class MainWindow(QMainWindow):
         self.video_label = QLabel()
         self.video_label.setAlignment(Qt.AlignCenter)
         self.video_label.setStyleSheet("background-color: #111; color: #888;")
-        self.video_label.setText("Camera stopped")
+        self.video_label.setText(_("Camera stopped"))
         self.video_label.setWordWrap(True)
         self.video_label.setMinimumSize(640, 480)
         main_layout.addWidget(self.video_label, stretch=3)
@@ -94,7 +95,6 @@ class MainWindow(QMainWindow):
         self.flash_overlay.hide()
 
         controls = QWidget()
-        controls.setFixedWidth(280)
         controls_layout = QVBoxLayout(controls)
         main_layout.addWidget(controls, stretch=0)
 
@@ -122,43 +122,51 @@ class MainWindow(QMainWindow):
         self.display_panel = DisplayPanel()
         controls_layout.addWidget(self.display_panel)
         controls_layout.addStretch()
+        # Wide enough for the longest label in the active language (translations
+        # can be longer than English), but never narrower than 280 px. The
+        # language is fixed for the whole run, so this is computed once.
+        controls.setFixedWidth(max(280, controls.minimumSizeHint().width()))
 
         self.status = QStatusBar()
         self.setStatusBar(self.status)
         if self.stage_module is not None:
             self.stage_module.status_message.connect(self.status.showMessage)
         if self.mode is AppMode.SIMULATION:
-            self.status.showMessage("SIMULATION MODE")
+            self.status.showMessage(_("SIMULATION MODE"))
         elif self.mode is AppMode.CAMERA_ONLY:
-            self.status.showMessage("CAMERA-ONLY MODE")
+            self.status.showMessage(_("CAMERA-ONLY MODE"))
         else:
             port = getattr(stage, "port", None)
-            self.status.showMessage(f"Stage connected ({port})" if port else "Stage connected")
+            self.status.showMessage(_("Stage connected ({port})").format(port=port) if port else _("Stage connected"))
 
     # ----------------------------------------------------- Camera handling --
     def _detect_camera_names(self) -> None:
         result = detect_camera_names()
         if not result.supported:
             QMessageBox.information(
-                self, "Windows only",
-                "Name detection uses DirectShow and only works on Windows.\n\n"
-                "Just try device index 0, 1, 2... in the spinbox and click "
-                "Start Stream to find the right one.",
+                self, _("Windows only"),
+                _(
+                    "Name detection uses DirectShow and only works on Windows.\n\n"
+                    "Just try device index 0, 1, 2... in the spinbox and click "
+                    "Start Stream to find the right one."
+                ),
             )
             return
         if result.error:
-            QMessageBox.information(self, "Camera name detection", result.error)
+            QMessageBox.information(self, _("Camera name detection"), result.error)
             return
         if not result.names:
-            QMessageBox.information(self, "No cameras found", "No DirectShow camera devices were detected.")
+            QMessageBox.information(self, _("No cameras found"), _("No DirectShow camera devices were detected."))
             return
         lines = "\n".join(f"  {i}: {name}" for i, name in enumerate(result.names))
         QMessageBox.information(
-            self, "Detected cameras",
-            f"Device order seen by Windows (usually matches the index used "
-            f"here, regardless of which backend you stream with):\n\n{lines}\n\n"
-            f"Set the Device index spinbox above to the number next to your "
-            f"camera's name, then click Start Stream.",
+            self, _("Detected cameras"),
+            _(
+                "Device order seen by Windows (usually matches the index used "
+                "here, regardless of which backend you stream with):\n\n{lines}\n\n"
+                "Set the Device index spinbox above to the number next to your "
+                "camera's name, then click Start Stream."
+            ).format(lines=lines),
         )
 
     def _start_stream(self) -> None:
@@ -175,7 +183,7 @@ class MainWindow(QMainWindow):
 
         self.camera_panel.set_streaming(True)
         self.frame_count = 0
-        self.status.showMessage("Streaming...")
+        self.status.showMessage(_("Streaming..."))
 
     def _stop_stream(self) -> None:
         if self.camera_thread is not None:
@@ -184,18 +192,18 @@ class MainWindow(QMainWindow):
         if self.video_writer is not None:
             self._toggle_recording()  # cleanly closes the file
         self.camera_panel.set_streaming(False)
-        self.video_label.setText("Camera stopped")
+        self.video_label.setText(_("Camera stopped"))
         self.video_label.setPixmap(QPixmap())
-        self.status.showMessage("Idle")
+        self.status.showMessage(_("Idle"))
 
     def _on_error(self, kind: str, message: str) -> None:
         """No modal dialog: the image box itself says what happened, so the
         user can just change the device index and press Start Stream again."""
         self._stop_stream()
         headline = {
-            ERR_NOT_DETECTED: "Camera not detected",
-            ERR_LOST: "Camera disconnected",
-        }.get(kind, "Camera error")
+            ERR_NOT_DETECTED: _("Camera not detected"),
+            ERR_LOST: _("Camera disconnected"),
+        }.get(kind, _("Camera error"))
         self.video_label.setText(f"{headline}\n\n{message}")
         self.status.showMessage(f"{headline}: {message}")
 
@@ -229,7 +237,7 @@ class MainWindow(QMainWindow):
         qimg = QImage(rgb.data, w, h, ch * w, QImage.Format_RGB888)
         self.video_label.setPixmap(QPixmap.fromImage(qimg))
 
-        self.status.showMessage(f"Frame {self.frame_count} | {fps:.1f} fps")
+        self.status.showMessage(_("Frame {count} | {fps:.1f} fps").format(count=self.frame_count, fps=fps))
 
     def _draw_overlays(self, frame: np.ndarray) -> np.ndarray:
         if self.display_panel.show_scale_bar:
@@ -247,21 +255,21 @@ class MainWindow(QMainWindow):
 
     # -------------------------------------------------------------- Export --
     def _choose_output_dir(self) -> None:
-        directory = QFileDialog.getExistingDirectory(self, "Choose output folder", str(self._output_dir))
+        directory = QFileDialog.getExistingDirectory(self, _("Choose output folder"), str(self._output_dir))
         if directory:
             self._output_dir = Path(directory)
             self.capture_panel.set_output_dir_text(self._output_dir)
 
     def _save_snapshot(self) -> None:
         if self.last_frame is None:
-            self.status.showMessage("No frame to save yet.")
+            self.status.showMessage(_("No frame to save yet."))
             return
         frame = self._draw_overlays(self.last_frame.copy())
         self.snapshot_count += 1
         ts = datetime.now().strftime("%Y%m%d_%H%M%S_%f")[:-3]
         filename = self._output_dir / f"frame_{ts}.png"
         cv2.imwrite(str(filename), frame)
-        self.status.showMessage(f"Saved {filename}  ({self.snapshot_count} total)")
+        self.status.showMessage(_("Saved {filename}  ({count} total)").format(filename=filename, count=self.snapshot_count))
         self._flash_snapshot()
 
     def _flash_snapshot(self) -> None:
@@ -273,7 +281,7 @@ class MainWindow(QMainWindow):
     def _toggle_recording(self) -> None:
         if self.video_writer is None:
             if self.last_frame is None:
-                QMessageBox.information(self, "Start stream first", "Start the camera stream before recording.")
+                QMessageBox.information(self, _("Start stream first"), _("Start the camera stream before recording."))
                 return
             h, w = self.last_frame.shape[:2]
             ts = datetime.now().strftime("%Y%m%d_%H%M%S")
@@ -283,14 +291,14 @@ class MainWindow(QMainWindow):
             self.capture_panel.set_recording(True)
             self._recording_blink_on = True
             self.recording_blink_timer.start(RECORDING_BLINK_INTERVAL_MS)
-            self.status.showMessage(f"Recording to {path}")
+            self.status.showMessage(_("Recording to {path}").format(path=path))
         else:
             self.video_writer.release()
             self.video_writer = None
             self.recording_blink_timer.stop()
             self._recording_blink_on = False
             self.capture_panel.set_recording(False)
-            self.status.showMessage("Recording stopped")
+            self.status.showMessage(_("Recording stopped"))
 
     # ------------------------------------------------------------- Cleanup --
     def closeEvent(self, event) -> None:

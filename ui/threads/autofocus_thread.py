@@ -25,6 +25,7 @@ from core.autofocus import (
 )
 from core.types import Axis, Direction
 from hardware.abstract import StageController
+from core.i18n import _, ngettext
 from hardware.errors import StageCommunicationError
 
 
@@ -147,11 +148,14 @@ class AutoFocusThread(QThread):
             best_score = max(best_score, fine_score)
 
             self.finished_focus.emit(
-                f"Auto-focus complete (sharpness {best_score:.1f}, "
-                f"{coarse_passes} coarse pass{'es' if coarse_passes != 1 else ''} + fine pass)"
+                ngettext(
+                    "Auto-focus complete (sharpness {sharpness:.1f}, {passes} coarse pass + fine pass)",
+                    "Auto-focus complete (sharpness {sharpness:.1f}, {passes} coarse passes + fine pass)",
+                    coarse_passes,
+                ).format(sharpness=best_score, passes=coarse_passes)
             )
         except StageCommunicationError as e:
             self.stage_failed.emit(str(e))
-            self.finished_focus.emit("Auto-focus aborted: lost communication with the stage")
+            self.finished_focus.emit(_("Auto-focus aborted: lost communication with the stage"))
         except Exception as e:
-            self.finished_focus.emit(f"Auto-focus error: {e}")
+            self.finished_focus.emit(_("Auto-focus error: {error}").format(error=e))

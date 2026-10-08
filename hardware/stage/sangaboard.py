@@ -7,6 +7,7 @@ import time
 from typing import Callable, Optional
 
 from core.config import SANGABOARD_MAX_STEPS_PER_SEC, default_stage_port
+from core.i18n import _
 from core.platform_info import CURRENT_PLATFORM, Platform
 from core.types import AxisCalibration, Direction
 from hardware.abstract import StageController
@@ -48,17 +49,17 @@ class SangaboardStageController(PositionTrackingMixin, StageController):
         """
         if Sangaboard is None:
             raise StageCommunicationError(
-                "The 'sangaboard' Python package is not installed (pip install sangaboard)."
+                _("The 'sangaboard' Python package is not installed (pip install sangaboard).")
             )
 
         candidates = [self.port] if self._explicit_port else [self.port, None]
-        errors: list[str] = []
+        errors: list[Exception] = []
         for candidate in candidates:
             try:
                 self.sb = Sangaboard(port=candidate, timeout=self.timeout)
             except Exception as e:
                 logger.warning("Could not connect to Sangaboard (port=%s): %s", candidate or "auto-scan", e)
-                errors.append(str(e))
+                errors.append(e)
                 self.sb = None
                 continue
             self._connected = True
@@ -98,7 +99,7 @@ class SangaboardStageController(PositionTrackingMixin, StageController):
         callback: Optional[Callable[[], None]],
     ) -> None:
         if not self.is_connected():
-            raise StageCommunicationError("The stage is not connected.")
+            raise StageCommunicationError(_("The stage is not connected."))
 
         self._stop_requested = False
         dx = dy = dz = 0
@@ -133,8 +134,10 @@ class SangaboardStageController(PositionTrackingMixin, StageController):
             logger.error("Error during Sangaboard move: %s", e)
             self._connected = False
             raise StageCommunicationError(
-                f"Lost communication with the stage during a move ({e}). "
-                "Check the USB cable and the board's power."
+                _(
+                    "Lost communication with the stage during a move ({error}). "
+                    "Check the USB cable and the board's power."
+                ).format(error=e)
             ) from e
         finally:
             self._apply_step_delta(direction, actual_steps)
@@ -169,7 +172,7 @@ class SangaboardStageController(PositionTrackingMixin, StageController):
         return True
 
 
-def _explain_connection_failure(port: str, explicit: bool, errors: list[str], scanned: bool) -> str:
+def _explain_connection_failure(port: str, explicit: bool, errors: list[Exception], scanned: bool) -> str:
     """Build a user-facing explanation, distinguishing the common causes."""
     try:
         from serial.tools import list_ports
@@ -179,23 +182,32 @@ def _explain_connection_failure(port: str, explicit: bool, errors: list[str], sc
 
     # The first error is the one for the configured/default port; the generic
     # "no valid port" text from the automatic scan is not useful to the user.
-    detail = next((e for e in errors if e), "no response")
-    lines = [f"Could not connect to the Sangaboard on {port}.", f"Reason: {detail}"]
+    detail = str(errors[0]) if errors else _("no response")
+    lines = [
+        _("Could not connect to the Sangaboard on {port}.").format(port=port),
+        _("Reason: {reason}").format(reason=detail),
+    ]
     if scanned:
-        lines.append("An automatic scan of the other serial ports did not find a Sangaboard either.")
+        lines.append(_("An automatic scan of the other serial ports did not find a Sangaboard either."))
 
-    lowered = detail.lower()
-    if "permission" in lowered or "access is denied" in lowered:
-        lines.append(
-            "The port exists but could not be opened. Another program may be using it"
-            + (
-                ", or your user is not in the 'dialout' group "
+    # Decide by exception type, never by the OS message text: that text is
+    # localized (a Spanish Windows says "Acceso denegado"), but the exception
+    # class name and errno are not.
+    denied = any(
+        isinstance(e, PermissionError) or getattr(e, "errno", None) == 13 or "PermissionError" in str(e)
+        for e in errors
+    )
+    if denied:
+        if CURRENT_PLATFORM == Platform.LINUX:
+            lines.append(_(
+                "The port exists but could not be opened. Another program may be using it, "
+                "or your user is not in the 'dialout' group "
                 "(sudo usermod -aG dialout $USER, then log out and back in)."
-                if CURRENT_PLATFORM == Platform.LINUX else "."
-            )
-        )
+            ))
+        else:
+            lines.append(_("The port exists but could not be opened. Another program may be using it."))
     elif not visible:
-        lines.append("No serial ports were found at all. Is the board plugged in and powered?")
+        lines.append(_("No serial ports were found at all. Is the board plugged in and powered?"))
     else:
-        lines.append("Serial ports visible to this computer: " + ", ".join(visible))
+        lines.append(_("Serial ports visible to this computer: {ports}").format(ports=", ".join(visible)))
     return "\n".join(lines)

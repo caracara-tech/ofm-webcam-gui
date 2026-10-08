@@ -9,6 +9,8 @@ import cv2
 import numpy as np
 from PyQt5.QtCore import QThread, pyqtSignal
 
+from core.i18n import _
+
 
 ERR_NOT_DETECTED = "not_detected"  # could not open / never delivered a frame
 ERR_LOST = "lost"  # was streaming, then stopped delivering frames
@@ -37,8 +39,9 @@ class CameraThread(QThread):
             if cap is None or not cap.isOpened():
                 self.error_occurred.emit(
                     ERR_NOT_DETECTED,
-                    f"Could not open camera at index {self.device_index}. "
-                    f"Try a different device index or backend."
+                    _("Could not open camera at index {index}. Try a different device index or backend.").format(
+                        index=self.device_index
+                    ),
                 )
                 return
 
@@ -49,11 +52,11 @@ class CameraThread(QThread):
             # Brief warm-up: some backends (esp. MSMF) need a moment before
             # the first frame is actually deliverable.
             warm_up_ok = False
-            for _ in range(20):
+            for _attempt in range(20):
                 if not self._running:
                     cap.release()
                     return
-                ret, _ = cap.read()
+                ret, _frame = cap.read()
                 if ret:
                     warm_up_ok = True
                     break
@@ -62,9 +65,10 @@ class CameraThread(QThread):
             if not warm_up_ok:
                 self.error_occurred.emit(
                     ERR_NOT_DETECTED,
-                    f"Camera opened but never delivered a frame at index "
-                    f"{self.device_index}. It may be in use by another app, "
-                    f"or need a different backend."
+                    _(
+                        "Camera opened but never delivered a frame at index {index}. "
+                        "It may be in use by another app, or need a different backend."
+                    ).format(index=self.device_index),
                 )
                 cap.release()
                 return
@@ -73,7 +77,7 @@ class CameraThread(QThread):
             while self._running:
                 ret, frame = cap.read()
                 if not ret:
-                    self.error_occurred.emit(ERR_LOST, "Lost connection to camera (no frame).")
+                    self.error_occurred.emit(ERR_LOST, _("Lost connection to camera (no frame)."))
                     break
                 now = time.time()
                 dt = now - last_time

@@ -15,6 +15,7 @@ import logging
 from dataclasses import dataclass
 from typing import List, Optional
 
+from core.i18n import _
 from core.platform_info import current_profile
 
 logger = logging.getLogger(__name__)
@@ -45,7 +46,7 @@ def detect_camera_names() -> CameraNameDetectionResult:
     except ImportError:
         return CameraNameDetectionResult(
             supported=True,
-            error="The optional 'pygrabber' package is not installed (pip install pygrabber).",
+            error=_("The optional 'pygrabber' package is not installed (pip install pygrabber)."),
         )
 
     try:

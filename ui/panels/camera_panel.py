@@ -5,6 +5,7 @@ from __future__ import annotations
 from PyQt5.QtCore import pyqtSignal
 from PyQt5.QtWidgets import QComboBox, QGridLayout, QGroupBox, QLabel, QPushButton, QSpinBox
 
+from core.i18n import _
 from core.config import RESOLUTIONS, default_backend_position, platform_backends
 from core.platform_info import current_profile
 
@@ -18,10 +19,10 @@ class CameraPanel(QGroupBox):
     detect_names_requested = pyqtSignal()
 
     def __init__(self, parent=None):
-        super().__init__("Camera", parent)
+        super().__init__(_("Camera"), parent)
         layout = QGridLayout(self)
 
-        layout.addWidget(QLabel("Device index:"), 0, 0)
+        layout.addWidget(QLabel(_("Device index:")), 0, 0)
         self.device_spin = QSpinBox()
         self.device_spin.setRange(0, 9)
         self.device_spin.setValue(0)
@@ -29,12 +30,12 @@ class CameraPanel(QGroupBox):
 
         # Only offered on platforms where it actually works (Windows/DirectShow).
         self._show_detect_names = current_profile().supports_camera_name_detection
-        self.detect_names_btn = QPushButton("Detect Camera Names")
+        self.detect_names_btn = QPushButton(_("Detect Camera Names"))
         self.detect_names_btn.clicked.connect(self.detect_names_requested.emit)
         self.detect_names_btn.setVisible(self._show_detect_names)
         layout.addWidget(self.detect_names_btn, 1, 0, 1, 2)
 
-        layout.addWidget(QLabel("Backend:"), 2, 0)
+        layout.addWidget(QLabel(_("Backend:")), 2, 0)
         self.backend_combo = QComboBox()
         self._backends = platform_backends()
         for backend in self._backends:
@@ -42,13 +43,13 @@ class CameraPanel(QGroupBox):
         self.backend_combo.setCurrentIndex(default_backend_position())
         layout.addWidget(self.backend_combo, 2, 1)
 
-        layout.addWidget(QLabel("Resolution:"), 3, 0)
+        layout.addWidget(QLabel(_("Resolution:")), 3, 0)
         self.resolution_combo = QComboBox()
         for res in RESOLUTIONS:
             self.resolution_combo.addItem(res.label)
         layout.addWidget(self.resolution_combo, 3, 1)
 
-        self.start_btn = QPushButton("Start Stream")
+        self.start_btn = QPushButton(_("Start Stream"))
         self.start_btn.clicked.connect(self._on_start_clicked)
         layout.addWidget(self.start_btn, 4, 0, 1, 2)
 
@@ -62,7 +63,7 @@ class CameraPanel(QGroupBox):
 
     def set_streaming(self, streaming: bool) -> None:
         self._streaming = streaming
-        self.start_btn.setText("Stop Stream" if streaming else "Start Stream")
+        self.start_btn.setText(_("Stop Stream") if streaming else _("Start Stream"))
 
     @property
     def device_index(self) -> int:

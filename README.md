@@ -24,11 +24,13 @@ stages).
 
 ```
 ofm-webcam-gui/
-├── app.py                      # Entry point: python app.py [--mode camera-stage|camera|simulation] [--stage-port PORT] [--log-level DEBUG]
+├── app.py                      # Entry point: python app.py [--mode camera-stage|camera|simulation] [--stage-port PORT] [--lang CODE] [--log-level DEBUG]
 ├── core/                       # Framework-agnostic types, config, and math (no Qt, no cv2 I/O)
 │   ├── types.py                #   Axis, Direction, Position, AxisCalibration, Resolution, ...
 │   ├── platform_info.py        #   Platform detection + per-OS defaults (PlatformProfile)
 │   ├── app_mode.py             #   AppMode enum: camera-stage / camera-only / simulation
+│   ├── i18n.py                 #   Translation runtime (stdlib gettext only)
+│   ├── locales/                #   Translation catalogs: <code>/LC_MESSAGES/*.po + compiled *.mo
 │   ├── config.py               #   Resolutions, backend lists, default ports
 │   ├── stage_motion.py         #   plan_jog(), pure jog-planning math (unit-testable)
 │   ├── autofocus.py            #   Autofocus search math: sweep planning, focus scoring, convergence
@@ -64,7 +66,9 @@ whether camera-name detection is available, are resolved by
 `core/platform_info.py` at runtime; nothing else in the codebase calls
 `platform.system()` directly. `requirements/` is split into `base.txt`
 (shared), `windows.txt` (adds `pygrabber` for camera-name detection), and
-`linux.txt` (omits it, since it can't be installed on Linux).
+`linux.txt` (omits it, since it can't be installed on Linux). A fourth file,
+`i18n.txt`, is only for people working on translations (see below); running
+or developing the application never needs it.
 
 ---
 
@@ -106,6 +110,16 @@ error at startup (with a hint about this group); see
 
 ---
 
+### Optional: working on translations
+
+Only needed to edit or add interface languages, not to run or develop the app:
+
+```bash
+pip install -r requirements/i18n.txt     # Babel, used by tools/i18n.py
+```
+
+See [docs/TRANSLATING.md](docs/TRANSLATING.md).
+
 ## Usage
 
 ```bash
@@ -114,6 +128,7 @@ python app.py --mode camera-stage   # skip the dialog
 python app.py --mode camera
 python app.py --mode simulation
 python app.py --stage-port COM5     # force the stage's serial port
+python app.py --lang es_419         # interface language for this run
 python app.py --log-level DEBUG
 python app.py --help              # modes, features and examples
 ```

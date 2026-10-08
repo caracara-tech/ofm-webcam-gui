@@ -360,6 +360,21 @@ default is honest about what it can and can't know.
   Never falls back to simulation.
 - **`create_mock_stage() -> MockStageController`** —> the simulated stage.
 
+### `core/i18n.py`, `ui/language.py`, `tools/i18n.py` — interface language
+
+- **`core/i18n.py`** (stdlib `gettext` only, no Qt, no extra dependency):
+  `_()`, `ngettext()`, `pgettext()`, `N_()` and `set_language()`. English
+  source text is the message id, so missing translations fall back to
+  English. Languages are discovered from `core/locales/*/LC_MESSAGES/*.mo`
+  and carry their own name inside the catalog, so adding one needs no code.
+- **`ui/language.py`** —> the Qt side: remembers the choice (QSettings) and
+  switches Qt's built-in texts (OK/Cancel, file dialogs) to the same language.
+- **`tools/i18n.py`** —> translator tooling (extract/update/new/compile/check),
+  the only code that needs Babel. The app never imports it.
+- The language is fixed for a run (chosen in the startup dialog or `--lang`),
+  which lets the UI size itself once and avoids retranslating live widgets.
+- Full workflow and style guide: [TRANSLATING.md](TRANSLATING.md).
+
 ### `ui/startup.py` and `ui/stage_module.py`
 
 - **`ModeDialog` / `resolve_session()`** —> mode picker and the

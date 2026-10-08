@@ -20,11 +20,12 @@ from PyQt5.QtWidgets import QMessageBox, QWidget
 
 from core.autofocus import AutoFocusSettings
 from core.config import SANGABOARD_MAX_STEPS_PER_SEC
+from core.i18n import _
 from core.stage_motion import plan_jog
 from core.types import Axis, Direction, StageMotionSettings
 from hardware.abstract import StageController
 from hardware.stage import SangaboardStageController
-from .panels.stage_panel import StagePanel
+from .panels.stage_panel import StagePanel, direction_letter
 from .threads.autofocus_thread import AutoFocusThread
 from .threads.stage_thread import StageMovementThread
 
@@ -91,7 +92,7 @@ class StageModule(QObject):
         if self._movement_busy or self._connection_lost:
             return  # a jog or autofocus sweep is already in flight (or the stage is gone)
         if not self.stage.is_connected():
-            self._handle_stage_failure("The stage is not connected.")
+            self._handle_stage_failure(_("The stage is not connected."))
             return
 
         steps_per_sec_limit = (
@@ -106,13 +107,15 @@ class StageModule(QObject):
 
         if hasattr(self.stage, "set_step_delay"):
             if self.stage.set_step_delay(int(plan.delay_per_step_s * 1e6)) is False:
-                self._handle_stage_failure("The stage did not accept the speed setting (no response).")
+                self._handle_stage_failure(_("The stage did not accept the speed setting (no response)."))
                 return
 
         self._set_movement_busy(True)
         self._thread.add_movement(
             self.stage, direction, plan.steps, plan.delay_per_step_s,
-            f"Moved {direction.value} {plan.distance_um:.1f} \u00b5m",
+            _("Moved {direction} {distance:.1f} \u00b5m").format(
+                direction=direction_letter(direction), distance=plan.distance_um,
+            ),
         )
 
     def _on_movement_complete(self, message: str, direction: Direction) -> None:
@@ -140,14 +143,14 @@ class StageModule(QObject):
         if self._movement_busy or self._connection_lost:
             return
         if not self.stage.is_connected():
-            self._handle_stage_failure("The stage is not connected.")
+            self._handle_stage_failure(_("The stage is not connected."))
             return
         if not self._is_streaming() or self._get_frame() is None:
-            self.status_message.emit("Start the camera stream before running autofocus.")
+            self.status_message.emit(_("Start the camera stream before running autofocus."))
             return
 
         self._set_movement_busy(True)
-        self.status_message.emit("Running auto-focus...")
+        self.status_message.emit(_("Running auto-focus..."))
 
         self._autofocus_thread = AutoFocusThread(
             self.stage, self._get_frame, AutoFocusSettings(),
@@ -163,7 +166,7 @@ class StageModule(QObject):
         self._autofocus_thread.start()
 
     def _on_autofocus_progress(self, step: int, total: int) -> None:
-        self.status_message.emit(f"Auto-focus: sampling position {step}/{total}...")
+        self.status_message.emit(_("Auto-focus: sampling position {step}/{total}...").format(step=step, total=total))
 
     def _on_autofocus_finished(self, message: str) -> None:
         self.status_message.emit(message)
@@ -184,12 +187,14 @@ class StageModule(QObject):
         self._connection_lost = True
         logger.error("Stage communication failure: %s", detail)
         self.panel.set_enabled_all(False)
-        self.panel.setTitle("Stage Control \u2014 CONNECTION LOST")
-        self.status_message.emit("Stage connection lost")
+        self.panel.setTitle(_("Stage Control \u2014 CONNECTION LOST"))
+        self.status_message.emit(_("Stage connection lost"))
         QMessageBox.critical(
-            self._dialog_parent, "Stage communication error",
-            f"{detail}\n\n"
-            "Stage controls have been disabled. Check the USB cable and the "
-            "board's power, then restart the application to reconnect.\n\n"
-            "The position shown may no longer match the real stage position.",
+            self._dialog_parent, _("Stage communication error"),
+            _(
+                "{detail}\n\n"
+                "Stage controls have been disabled. Check the USB cable and the "
+                "board's power, then restart the application to reconnect.\n\n"
+                "The position shown may no longer match the real stage position."
+            ).format(detail=detail),
         )

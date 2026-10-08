@@ -1,0 +1,516 @@
+# Spanish (Latin America) translations for OFM Webcam Viewer.
+# Copyright (C) 2026 ORGANIZATION
+# This file is distributed under the same license as the OFM Webcam Viewer project.
+# FIRST AUTHOR <EMAIL@ADDRESS>, 2026.
+#
+#, fuzzy
+msgid ""
+msgstr ""
+"Project-Id-Version: OFM Webcam Viewer 0.1.0\n"
+"Report-Msgid-Bugs-To: EMAIL@ADDRESS\n"
+"POT-Creation-Date: 2026-10-07 02:17+0000\n"
+"PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
+"Last-Translator: OFM Webcam Viewer contributors\n"
+"Language: es_419\n"
+"Language-Team: Spanish (Latin America)\n"
+"Plural-Forms: nplurals=2; plural=(n != 1);\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=utf-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Generated-By: Babel 2.18.0\n"
+
+#: core/app_mode.py ui/main_window.py
+msgid "Camera + Stage"
+msgstr "Cámara + Platina"
+
+#: core/app_mode.py
+msgid "Camera only"
+msgstr "Solo cámara"
+
+#: core/app_mode.py
+msgid "Simulation"
+msgstr "Simulación"
+
+#: core/app_mode.py
+msgid ""
+"Full microscope: live camera and motorized stage control. Requires the stage board to be "
+"connected."
+msgstr ""
+"Microscopio completo: cámara en vivo y control de la platina motorizada. Requiere que la placa de"
+" la platina esté conectada."
+
+#: core/app_mode.py
+msgid "Device without motors: camera preview, snapshots and recording. No stage controls."
+msgstr ""
+"Dispositivo sin motores: vista previa de la cámara, capturas y grabación. Sin controles de "
+"platina."
+
+#: core/app_mode.py
+msgid "No hardware needed: full interface with a simulated stage (nothing physical moves)."
+msgstr "No requiere hardware: interfaz completa con una platina simulada (no se mueve nada físicamente)."
+
+#. Name of THIS language, written in that language, shown in the language selector (e.g. "Español
+#. (Latinoamérica)"). Do not translate literally.
+#: core/i18n.py
+msgctxt "language name"
+msgid "English"
+msgstr "Español (Latinoamérica)"
+
+#: hardware/camera_names.py
+msgid "The optional 'pygrabber' package is not installed (pip install pygrabber)."
+msgstr "El paquete opcional 'pygrabber' no está instalado (pip install pygrabber)."
+
+#: hardware/stage/sangaboard.py
+msgid "The 'sangaboard' Python package is not installed (pip install sangaboard)."
+msgstr "El paquete de Python 'sangaboard' no está instalado (pip install sangaboard)."
+
+#: hardware/stage/sangaboard.py ui/stage_module.py
+msgid "The stage is not connected."
+msgstr "La platina no está conectada."
+
+#: hardware/stage/sangaboard.py
+#, python-brace-format
+msgid ""
+"Lost communication with the stage during a move ({error}). Check the USB cable and the board's "
+"power."
+msgstr ""
+"Se perdió la comunicación con la platina durante un movimiento ({error}). Revise el cable USB y "
+"la alimentación de la placa."
+
+#: hardware/stage/sangaboard.py
+msgid "no response"
+msgstr "sin respuesta"
+
+#: hardware/stage/sangaboard.py
+#, python-brace-format
+msgid "Could not connect to the Sangaboard on {port}."
+msgstr "No se pudo conectar con la Sangaboard en {port}."
+
+#: hardware/stage/sangaboard.py
+#, python-brace-format
+msgid "Reason: {reason}"
+msgstr "Motivo: {reason}"
+
+#: hardware/stage/sangaboard.py
+msgid "An automatic scan of the other serial ports did not find a Sangaboard either."
+msgstr "Una búsqueda automática en los demás puertos seriales tampoco encontró una Sangaboard."
+
+#: hardware/stage/sangaboard.py
+msgid ""
+"The port exists but could not be opened. Another program may be using it, or your user is not in "
+"the 'dialout' group (sudo usermod -aG dialout $USER, then log out and back in)."
+msgstr ""
+"El puerto existe, pero no se pudo abrir. Es posible que otro programa lo esté usando, o que su "
+"usuario no pertenezca al grupo 'dialout' (sudo usermod -aG dialout $USER; luego cierre sesión y "
+"vuelva a iniciarla)."
+
+#: hardware/stage/sangaboard.py
+msgid "The port exists but could not be opened. Another program may be using it."
+msgstr "El puerto existe, pero no se pudo abrir. Es posible que otro programa lo esté usando."
+
+#: hardware/stage/sangaboard.py
+msgid "No serial ports were found at all. Is the board plugged in and powered?"
+msgstr "No se encontró ningún puerto serial. ¿La placa está conectada y encendida?"
+
+#: hardware/stage/sangaboard.py
+#, python-brace-format
+msgid "Serial ports visible to this computer: {ports}"
+msgstr "Puertos seriales visibles en este equipo: {ports}"
+
+#: ui/main_window.py ui/panels/camera_panel.py
+msgid "Camera"
+msgstr "Cámara"
+
+#: ui/main_window.py
+msgid "SIMULATION"
+msgstr "SIMULACIÓN"
+
+#: ui/main_window.py
+msgid "Camera stopped"
+msgstr "Cámara detenida"
+
+#: ui/main_window.py
+msgid "SIMULATION MODE"
+msgstr "MODO SIMULACIÓN"
+
+#: ui/main_window.py
+msgid "CAMERA-ONLY MODE"
+msgstr "MODO SOLO CÁMARA"
+
+#: ui/main_window.py
+#, python-brace-format
+msgid "Stage connected ({port})"
+msgstr "Platina conectada ({port})"
+
+#: ui/main_window.py
+msgid "Stage connected"
+msgstr "Platina conectada"
+
+#: ui/main_window.py
+msgid "Windows only"
+msgstr "Solo Windows"
+
+#: ui/main_window.py
+msgid ""
+"Name detection uses DirectShow and only works on Windows.\n"
+"\n"
+"Just try device index 0, 1, 2... in the spinbox and click Start Stream to find the right one."
+msgstr ""
+"La detección de nombres usa DirectShow y solo funciona en Windows.\n"
+"\n"
+"Basta con probar los índices de dispositivo 0, 1, 2... en el cuadro numérico y presionar Iniciar "
+"transmisión hasta encontrar el correcto."
+
+#: ui/main_window.py
+msgid "Camera name detection"
+msgstr "Detección de nombres de cámaras"
+
+#: ui/main_window.py
+msgid "No cameras found"
+msgstr "No se encontraron cámaras"
+
+#: ui/main_window.py
+msgid "No DirectShow camera devices were detected."
+msgstr "No se detectó ningún dispositivo de cámara DirectShow."
+
+#: ui/main_window.py
+msgid "Detected cameras"
+msgstr "Cámaras detectadas"
+
+#: ui/main_window.py
+#, python-brace-format
+msgid ""
+"Device order seen by Windows (usually matches the index used here, regardless of which backend "
+"you stream with):\n"
+"\n"
+"{lines}\n"
+"\n"
+"Set the Device index spinbox above to the number next to your camera's name, then click Start "
+"Stream."
+msgstr ""
+"Orden de dispositivos que ve Windows (normalmente coincide con el índice usado aquí, sin importar"
+" con qué backend se transmita):\n"
+"\n"
+"{lines}\n"
+"\n"
+"Ajuste el índice del dispositivo, arriba, al número que aparece junto al nombre de su cámara y "
+"luego presione Iniciar transmisión."
+
+#: ui/main_window.py
+msgid "Streaming..."
+msgstr "Transmitiendo..."
+
+#: ui/main_window.py
+msgid "Idle"
+msgstr "Inactivo"
+
+#: ui/main_window.py
+msgid "Camera not detected"
+msgstr "Cámara no detectada"
+
+#: ui/main_window.py
+msgid "Camera disconnected"
+msgstr "Cámara desconectada"
+
+#: ui/main_window.py
+msgid "Camera error"
+msgstr "Error de la cámara"
+
+#: ui/main_window.py
+#, python-brace-format
+msgid "Frame {count} | {fps:.1f} fps"
+msgstr "Fotograma {count} | {fps:.1f} fps"
+
+#: ui/main_window.py
+msgid "Choose output folder"
+msgstr "Elegir carpeta de salida"
+
+#: ui/main_window.py
+msgid "No frame to save yet."
+msgstr "Aún no hay ningún fotograma para guardar."
+
+#: ui/main_window.py
+#, python-brace-format
+msgid "Saved {filename}  ({count} total)"
+msgstr "Guardado {filename}  ({count} en total)"
+
+#: ui/main_window.py
+msgid "Start stream first"
+msgstr "Primero inicie la transmisión"
+
+#: ui/main_window.py
+msgid "Start the camera stream before recording."
+msgstr "Inicie la transmisión de la cámara antes de grabar."
+
+#: ui/main_window.py
+#, python-brace-format
+msgid "Recording to {path}"
+msgstr "Grabando en {path}"
+
+#: ui/main_window.py
+msgid "Recording stopped"
+msgstr "Grabación detenida"
+
+#: ui/stage_module.py
+msgid "The stage did not accept the speed setting (no response)."
+msgstr "La platina no aceptó el ajuste de velocidad (sin respuesta)."
+
+#: ui/stage_module.py
+#, python-brace-format
+msgid "Moved {direction} {distance:.1f} µm"
+msgstr "Se movió {direction} {distance:.1f} µm"
+
+#: ui/stage_module.py
+msgid "Start the camera stream before running autofocus."
+msgstr "Inicie la transmisión de la cámara antes de ejecutar el enfoque automático."
+
+#: ui/stage_module.py
+msgid "Running auto-focus..."
+msgstr "Ejecutando enfoque automático..."
+
+#: ui/stage_module.py
+#, python-brace-format
+msgid "Auto-focus: sampling position {step}/{total}..."
+msgstr "Enfoque automático: muestreando la posición {step}/{total}..."
+
+#: ui/stage_module.py
+msgid "Stage Control — CONNECTION LOST"
+msgstr "Control de platina — CONEXIÓN PERDIDA"
+
+#: ui/stage_module.py
+msgid "Stage connection lost"
+msgstr "Se perdió la conexión con la platina"
+
+#: ui/stage_module.py
+msgid "Stage communication error"
+msgstr "Error de comunicación con la platina"
+
+#: ui/stage_module.py
+#, python-brace-format
+msgid ""
+"{detail}\n"
+"\n"
+"Stage controls have been disabled. Check the USB cable and the board's power, then restart the "
+"application to reconnect.\n"
+"\n"
+"The position shown may no longer match the real stage position."
+msgstr ""
+"{detail}\n"
+"\n"
+"Los controles de la platina se han desactivado. Revise el cable USB y la alimentación de la "
+"placa; luego reinicie la aplicación para reconectar.\n"
+"\n"
+"La posición mostrada podría ya no coincidir con la posición real de la platina."
+
+#: ui/startup.py
+msgid "OFM Webcam Viewer — select mode"
+msgstr "OFM Webcam Viewer — seleccionar modo"
+
+#: ui/startup.py
+msgid "How is this device set up?"
+msgstr "¿Cómo está configurado este dispositivo?"
+
+#: ui/startup.py
+msgid "Language:"
+msgstr "Idioma:"
+
+#: ui/startup.py
+msgid "Stage not available"
+msgstr "Platina no disponible"
+
+#: ui/startup.py
+msgid "Camera + Stage mode needs the stage board. What would you like to do?"
+msgstr "El modo Cámara + Platina necesita la placa de la platina. ¿Qué desea hacer?"
+
+#: ui/startup.py
+msgid "Retry"
+msgstr "Reintentar"
+
+#: ui/startup.py
+msgid "Choose another mode"
+msgstr "Elegir otro modo"
+
+#: ui/startup.py
+msgid "Quit"
+msgstr "Salir"
+
+#: ui/panels/camera_panel.py
+msgid "Device index:"
+msgstr "Índice del dispositivo:"
+
+#: ui/panels/camera_panel.py
+msgid "Detect Camera Names"
+msgstr "Detectar nombres de cámaras"
+
+#: ui/panels/camera_panel.py
+msgid "Backend:"
+msgstr "Backend:"
+
+#: ui/panels/camera_panel.py
+msgid "Resolution:"
+msgstr "Resolución:"
+
+#: ui/panels/camera_panel.py
+msgid "Start Stream"
+msgstr "Iniciar transmisión"
+
+#: ui/panels/camera_panel.py
+msgid "Stop Stream"
+msgstr "Detener transmisión"
+
+#: ui/panels/capture_panel.py
+msgid "Snapshots & Recording"
+msgstr "Capturas y grabación"
+
+#: ui/panels/capture_panel.py
+msgid "Output folder:"
+msgstr "Carpeta de salida:"
+
+#: ui/panels/capture_panel.py
+msgid "Browse"
+msgstr "Examinar"
+
+#: ui/panels/capture_panel.py
+msgid "Burn timestamp into frame"
+msgstr "Marca de tiempo en el fotograma"
+
+#: ui/panels/capture_panel.py
+msgid "Save Snapshot (PNG)"
+msgstr "Guardar captura (PNG)"
+
+#: ui/panels/capture_panel.py
+msgid "Start Recording (.mp4)"
+msgstr "Iniciar grabación (.mp4)"
+
+#: ui/panels/capture_panel.py
+msgid "Stop Recording"
+msgstr "Detener grabación"
+
+#: ui/panels/display_panel.py
+msgid "Display"
+msgstr "Visualización"
+
+#: ui/panels/display_panel.py
+msgid "Show grid"
+msgstr "Mostrar cuadrícula"
+
+#: ui/panels/display_panel.py
+msgid "Show scale bar"
+msgstr "Mostrar barra de escala"
+
+#: ui/panels/display_panel.py
+msgid ""
+"Automatic - reads in pixels (e.g. \"100 px\"), computed directly from the image. No calibration "
+"needed."
+msgstr ""
+"Automática: se expresa en píxeles (p. ej., \"100 px\") y se calcula directamente a partir de la "
+"imagen. No requiere calibración."
+
+#: ui/panels/display_panel.py
+msgid "Advanced"
+msgstr "Avanzado"
+
+#: ui/panels/display_panel.py
+msgid "Override with physical calibration"
+msgstr "Usar calibración física"
+
+#: ui/panels/display_panel.py
+msgid ""
+"Only turn this on if you've measured a real um/pixel value (e.g. by imaging a stage micrometer) "
+"and want the scale bar in physical units instead of pixels."
+msgstr ""
+"Actívelo solo si midió un valor real de um/píxel (p. ej., al fotografiar un micrómetro de "
+"platina) y desea que la barra de escala se muestre en unidades físicas en lugar de píxeles."
+
+#. Jog button: move the stage up (a short abbreviation, 1-2 letters)
+#: ui/panels/stage_panel.py
+msgctxt "jog button: up"
+msgid "U"
+msgstr "Ar"
+
+#. Jog button: move the stage down (a short abbreviation, 1-2 letters)
+#: ui/panels/stage_panel.py
+msgctxt "jog button: down"
+msgid "D"
+msgstr "Ab"
+
+#. Jog button: move the stage left (a short abbreviation, 1-2 letters)
+#: ui/panels/stage_panel.py
+msgctxt "jog button: left"
+msgid "L"
+msgstr "Iz"
+
+#. Jog button: move the stage right (a short abbreviation, 1-2 letters)
+#: ui/panels/stage_panel.py
+msgctxt "jog button: right"
+msgid "R"
+msgstr "De"
+
+#: ui/panels/stage_panel.py
+msgid "Stage Control"
+msgstr "Control de platina"
+
+#: ui/panels/stage_panel.py
+msgid "XY Step (µm):"
+msgstr "Paso XY (µm):"
+
+#: ui/panels/stage_panel.py
+msgid "Z Step (µm):"
+msgstr "Paso Z (µm):"
+
+#: ui/panels/stage_panel.py
+msgid "Speed (µm/s):"
+msgstr "Velocidad (µm/s):"
+
+#: ui/panels/stage_panel.py
+msgid "Position (µm):"
+msgstr "Posición (µm):"
+
+#: ui/panels/stage_panel.py
+msgid "Run Auto-Focus (Z sweep)"
+msgstr "Enfoque automático (barrido Z)"
+
+#: ui/panels/stage_panel.py
+msgid "Auto-focus after each XY move"
+msgstr "Autoenfoque tras cada mov. XY"
+
+#: ui/panels/stage_panel.py
+msgid "Automatically re-runs the Z-sweep autofocus after every X/Y jog."
+msgstr ""
+"Vuelve a ejecutar automáticamente el barrido de enfoque automático en Z después de cada "
+"desplazamiento en X/Y."
+
+#: ui/threads/autofocus_thread.py
+#, python-brace-format
+msgid "Auto-focus complete (sharpness {sharpness:.1f}, {passes} coarse pass + fine pass)"
+msgid_plural "Auto-focus complete (sharpness {sharpness:.1f}, {passes} coarse passes + fine pass)"
+msgstr[0] "Enfoque automático completado (nitidez {sharpness:.1f}, {passes} pasada gruesa + pasada fina)"
+msgstr[1] "Enfoque automático completado (nitidez {sharpness:.1f}, {passes} pasadas gruesas + pasada fina)"
+
+#: ui/threads/autofocus_thread.py
+msgid "Auto-focus aborted: lost communication with the stage"
+msgstr "Enfoque automático interrumpido: se perdió la comunicación con la platina"
+
+#: ui/threads/autofocus_thread.py
+#, python-brace-format
+msgid "Auto-focus error: {error}"
+msgstr "Error de enfoque automático: {error}"
+
+#: ui/threads/camera_thread.py
+#, python-brace-format
+msgid "Could not open camera at index {index}. Try a different device index or backend."
+msgstr "No se pudo abrir la cámara en el índice {index}. Pruebe con otro índice de dispositivo o backend."
+
+#: ui/threads/camera_thread.py
+#, python-brace-format
+msgid ""
+"Camera opened but never delivered a frame at index {index}. It may be in use by another app, or "
+"need a different backend."
+msgstr ""
+"La cámara se abrió, pero nunca entregó un fotograma en el índice {index}. Puede que otra "
+"aplicación la esté usando o que necesite un backend diferente."
+
+#: ui/threads/camera_thread.py
+msgid "Lost connection to camera (no frame)."
+msgstr "Se perdió la conexión con la cámara (sin fotogramas)."
+

@@ -12,6 +12,10 @@ dependencies = [
     "pygrabber>=0.1.0; sys_platform == 'win32'",  # Windows-only camera names
 ]
 
+[project.optional-dependencies]
+# Only for working on translations (tools/i18n.py); the app itself needs nothing extra.
+i18n = ["babel>=2.12"]
+
 [project.scripts]
 ofm-webcam-gui = "app:main"
 
@@ -22,3 +26,6 @@ build-backend = "setuptools.build_meta"
 [tool.setuptools]
 py-modules = ["app"]
 packages = ["core", "hardware", "hardware.stage", "ui", "ui.panels", "ui.threads"]
+
+[tool.setuptools.package-data]
+core = ["locales/*/LC_MESSAGES/*.mo"]
