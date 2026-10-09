@@ -3,9 +3,9 @@ OFM Webcam Viewer — entry point.
 
 Run from the repository root (the directory containing this file):
     python app.py                       # asks which mode to start in
-    python app.py --mode camera-stage   # skip the dialog: camera + real stage
-    python app.py --mode camera         # skip the dialog: camera only (no motors)
-    python app.py --mode simulation     # skip the dialog: simulated stage
+    python app.py --mode automated      # skip the dialog: camera + real stage
+    python app.py --mode manual         # skip the dialog: camera only (no motors)
+    python app.py --mode simulation     # simulated stage (command line only)
     python app.py --lang es_419         # interface language for this run
     python app.py --help                # what this software can do
 """
@@ -16,6 +16,7 @@ import argparse
 import logging
 import sys
 from pathlib import Path
+from typing import Optional
 
 from core.app_mode import AppMode
 from core.config import DEFAULT_OUTPUT_DIR
@@ -40,33 +41,39 @@ def _languages() -> str:
 def _epilog() -> str:
     return f"""\
 MODES  (pick one in the startup dialog, or skip it with --mode)
-  camera-stage  Camera + Stage. The full microscope: live camera and real
-                stage control. Needs the stage board connected; if it
-                cannot be reached you are asked to retry, choose another
-                mode, or quit. If it stops responding while running, an
-                error is shown and the stage controls are disabled.
-  camera        Camera only, for devices without motors. Stage controls are
-                not shown.
-  simulation    No hardware needed. Full interface with a simulated stage;
+  automated     The full microscope: live camera and real stage control.
+                Needs the stage board connected; if it cannot be reached you
+                are asked to retry, choose another mode, or quit. If it
+                stops responding while running, an error is shown and the
+                stage controls are disabled.
+  manual        For devices without motors: camera preview, snapshots and
+                recording. Stage controls are not shown.
+  simulation    Command line only (not listed in the startup dialog). No
+                hardware needed: the full interface with a simulated stage;
                 nothing physical moves. Handy for trying the software.
+  The "Change mode / language..." button in the window returns to the
+  startup dialog without closing the program.
 
 FEATURES
-  Camera        Choose device index, backend (Windows: Media Foundation or
-                DirectShow) and resolution (up to 1280 x 720), then Start
-                Stream. Live FPS is shown in the status bar. If the camera
-                cannot be opened the image box says "Camera not detected":
-                try another device index and press Start Stream again.
+  Camera        Choose the camera by name, the backend (Windows: Media
+                Foundation or DirectShow) and the resolution (up to
+                1280 x 720), then Start Stream. The refresh button rereads
+                the camera list. If the camera cannot be opened the image
+                box says "Camera not detected": pick another device or
+                backend and press Start Stream again.
   Capture       PNG snapshots and MP4 recording (blinking REC marker in the
                 preview only), optional burned-in timestamp.
-                Output folder: {DEFAULT_OUTPUT_DIR}  (change with Browse).
+                Output folder: {DEFAULT_OUTPUT_DIR}  (change with Browse,
+                show its files with Open folder).
   Display       Alignment grid (preview only, never saved) and scale bar
-                (saved into snapshots/recordings). The scale bar reads in
-                pixels by default, or in um with a physical calibration.
+                (saved into snapshots/recordings), in white or black. The
+                scale bar reads in pixels by default, or in um with a
+                physical calibration.
   Language      The interface language is chosen in the startup dialog and
                 remembered for next time, or forced for one run with --lang.
                 Installed: {_languages()}. Only the interface is translated;
                 this help text and the log output stay in English.
-  Stage         (camera-stage and simulation modes) U/D/L/R for XY and
+  Stage         (automated and simulation modes) U/D/L/R for XY and
                 W/S for Z focus, with step size (um), speed (um/s) and a
                 live position readout. Autofocus runs a coarse-to-fine Z
                 sweep and can optionally re-run after every XY move; it
@@ -75,9 +82,9 @@ FEATURES
 EXAMPLES
   {RUN_CMD}
       choose the mode in a dialog
-  {RUN_CMD} --mode camera
-      camera-only device, no dialog
-  {RUN_CMD} --mode camera-stage --stage-port COM5
+  {RUN_CMD} --mode manual
+      device without motors, no dialog
+  {RUN_CMD} --mode automated --stage-port COM5
   {RUN_CMD} --mode simulation --log-level DEBUG
   {RUN_CMD} --lang es_419
 """
@@ -136,11 +143,12 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
     )
     parser.add_argument(
         "--mode", choices=[m.value for m in AppMode],
-        help="Skip the startup dialog and launch directly in this mode",
+        help="Skip the startup dialog and launch directly in this mode "
+             "(simulation is only available this way)",
     )
     parser.add_argument(
         "--simulate", action="store_true",
-        help="Deprecated alias for --mode simulation",
+        help="Shorthand for --mode simulation",
     )
     parser.add_argument(
         "--stage-port", default=None, metavar="PORT",
@@ -185,8 +193,6 @@ def main() -> None:
     from PyQt5.QtWidgets import QApplication
 
     from ui.language import apply_language, saved_language, system_locale
-    from ui.main_window import MainWindow
-    from ui.startup import resolve_session
 
     logging.basicConfig(level=getattr(logging, args.log_level), format="%(levelname)s %(name)s: %(message)s")
 
@@ -195,13 +201,31 @@ def main() -> None:
     app = QApplication(sys.argv)
     # Priority: --lang, then the remembered choice, then the OS language, then English.
     apply_language(resolve_language(args.lang, saved_language(), system_locale()))
-    session = resolve_session(requested, args.stage_port)
-    if session is None:
-        sys.exit(0)  # user closed the dialog or chose Quit
+    sys.exit(run_sessions(app, requested, args.stage_port))
 
-    window = MainWindow(session.mode, session.stage)
-    window.show()
-    sys.exit(app.exec_())
+
+def run_sessions(app, requested: Optional[AppMode], stage_port: Optional[str]) -> int:
+    """Run one window per session until the user quits; returns the exit code.
+
+    `requested` (the command-line mode, if any) only applies to the first
+    session. After "Change mode / language..." the window reports the mode
+    picked on the start screen (`next_mode`) and we start it, without the
+    program ever closing.
+    """
+    from ui.main_window import MainWindow
+    from ui.startup import resolve_session
+
+    exit_code = 0
+    while True:
+        session = resolve_session(requested, stage_port)
+        if session is None:
+            return exit_code  # the user closed the dialog or chose Quit
+        window = MainWindow(session.mode, session.stage)
+        window.show()
+        exit_code = app.exec_()
+        requested = window.next_mode
+        if requested is None:
+            return exit_code
 
 
 if __name__ == "__main__":

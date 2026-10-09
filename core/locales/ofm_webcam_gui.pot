@@ -7,7 +7,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: OFM Webcam Viewer 0.1.0\n"
 "Report-Msgid-Bugs-To: EMAIL@ADDRESS\n"
-"POT-Creation-Date: 2026-10-07 02:17+0000\n"
+"POT-Creation-Date: 2026-10-08 18:38+0000\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
@@ -16,12 +16,12 @@ msgstr ""
 "Content-Transfer-Encoding: 8bit\n"
 "Generated-By: Babel 2.18.0\n"
 
-#: core/app_mode.py ui/main_window.py
-msgid "Camera + Stage"
+#: core/app_mode.py
+msgid "Automated"
 msgstr ""
 
 #: core/app_mode.py
-msgid "Camera only"
+msgid "Manual"
 msgstr ""
 
 #: core/app_mode.py
@@ -49,8 +49,13 @@ msgctxt "language name"
 msgid "English"
 msgstr ""
 
-#: hardware/camera_names.py
-msgid "The optional 'pygrabber' package is not installed (pip install pygrabber)."
+#: hardware/cameras.py
+msgid "Camera names need the optional 'pygrabber' package (pip install pygrabber)."
+msgstr ""
+
+#: hardware/cameras.py ui/panels/camera_panel.py
+#, python-brace-format
+msgid "Camera {index}"
 msgstr ""
 
 #: hardware/stage/sangaboard.py
@@ -105,10 +110,6 @@ msgstr ""
 msgid "Serial ports visible to this computer: {ports}"
 msgstr ""
 
-#: ui/main_window.py ui/panels/camera_panel.py
-msgid "Camera"
-msgstr ""
-
 #: ui/main_window.py
 msgid "SIMULATION"
 msgstr ""
@@ -118,11 +119,19 @@ msgid "Camera stopped"
 msgstr ""
 
 #: ui/main_window.py
+msgid "Change mode / language..."
+msgstr ""
+
+#: ui/main_window.py
+msgid "Return to the start screen to pick another mode or language"
+msgstr ""
+
+#: ui/main_window.py
 msgid "SIMULATION MODE"
 msgstr ""
 
 #: ui/main_window.py
-msgid "CAMERA-ONLY MODE"
+msgid "MANUAL MODE"
 msgstr ""
 
 #: ui/main_window.py
@@ -132,45 +141,6 @@ msgstr ""
 
 #: ui/main_window.py
 msgid "Stage connected"
-msgstr ""
-
-#: ui/main_window.py
-msgid "Windows only"
-msgstr ""
-
-#: ui/main_window.py
-msgid ""
-"Name detection uses DirectShow and only works on Windows.\n"
-"\n"
-"Just try device index 0, 1, 2... in the spinbox and click Start Stream to find the right one."
-msgstr ""
-
-#: ui/main_window.py
-msgid "Camera name detection"
-msgstr ""
-
-#: ui/main_window.py
-msgid "No cameras found"
-msgstr ""
-
-#: ui/main_window.py
-msgid "No DirectShow camera devices were detected."
-msgstr ""
-
-#: ui/main_window.py
-msgid "Detected cameras"
-msgstr ""
-
-#: ui/main_window.py
-#, python-brace-format
-msgid ""
-"Device order seen by Windows (usually matches the index used here, regardless of which backend "
-"you stream with):\n"
-"\n"
-"{lines}\n"
-"\n"
-"Set the Device index spinbox above to the number next to your camera's name, then click Start "
-"Stream."
 msgstr ""
 
 #: ui/main_window.py
@@ -196,6 +166,11 @@ msgstr ""
 #: ui/main_window.py
 #, python-brace-format
 msgid "Frame {count} | {fps:.1f} fps"
+msgstr ""
+
+#: ui/main_window.py
+#, python-brace-format
+msgid "Could not open the folder {path}"
 msgstr ""
 
 #: ui/main_window.py
@@ -267,8 +242,8 @@ msgstr ""
 msgid ""
 "{detail}\n"
 "\n"
-"Stage controls have been disabled. Check the USB cable and the board's power, then restart the "
-"application to reconnect.\n"
+"Stage controls have been disabled. Check the USB cable and the board's power, then use \"Change "
+"mode / language...\" (or restart the application) to reconnect.\n"
 "\n"
 "The position shown may no longer match the real stage position."
 msgstr ""
@@ -290,7 +265,7 @@ msgid "Stage not available"
 msgstr ""
 
 #: ui/startup.py
-msgid "Camera + Stage mode needs the stage board. What would you like to do?"
+msgid "Automated mode needs the stage board. What would you like to do?"
 msgstr ""
 
 #: ui/startup.py
@@ -306,11 +281,15 @@ msgid "Quit"
 msgstr ""
 
 #: ui/panels/camera_panel.py
-msgid "Device index:"
+msgid "Camera"
 msgstr ""
 
 #: ui/panels/camera_panel.py
-msgid "Detect Camera Names"
+msgid "Device:"
+msgstr ""
+
+#: ui/panels/camera_panel.py
+msgid "Refresh camera list"
 msgstr ""
 
 #: ui/panels/camera_panel.py
@@ -342,7 +321,11 @@ msgid "Browse"
 msgstr ""
 
 #: ui/panels/capture_panel.py
-msgid "Burn timestamp into frame"
+msgid "Open folder"
+msgstr ""
+
+#: ui/panels/capture_panel.py
+msgid "Open this folder in the file manager"
 msgstr ""
 
 #: ui/panels/capture_panel.py
@@ -351,6 +334,10 @@ msgstr ""
 
 #: ui/panels/capture_panel.py
 msgid "Start Recording (.mp4)"
+msgstr ""
+
+#: ui/panels/capture_panel.py
+msgid "Burn timestamp into frame"
 msgstr ""
 
 #: ui/panels/capture_panel.py
@@ -367,6 +354,18 @@ msgstr ""
 
 #: ui/panels/display_panel.py
 msgid "Show scale bar"
+msgstr ""
+
+#: ui/panels/display_panel.py
+msgid "White"
+msgstr ""
+
+#: ui/panels/display_panel.py
+msgid "Black"
+msgstr ""
+
+#: ui/panels/display_panel.py
+msgid "Scale bar color"
 msgstr ""
 
 #: ui/panels/display_panel.py
@@ -463,7 +462,7 @@ msgstr ""
 
 #: ui/threads/camera_thread.py
 #, python-brace-format
-msgid "Could not open camera at index {index}. Try a different device index or backend."
+msgid "Could not open the camera (device index {index}). Try a different device or backend."
 msgstr ""
 
 #: ui/threads/camera_thread.py

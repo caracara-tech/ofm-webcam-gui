@@ -139,10 +139,12 @@ def cmd_update() -> int:
         cat = _read_po(po)
         before = _ids(cat)
         cat.update(template, no_fuzzy_matching=False, update_header_comment=False, update_creation_date=False)
+        removed = len(cat.obsolete)
+        cat.obsolete.clear()  # strings no longer in the source are dropped, not kept as #~ leftovers
         _write_po(po, cat)
         added = len(_ids(cat) - before)
         todo = sum(1 for m in _real(cat) if not _is_translated(m) or m.fuzzy)
-        print(f"{_code(po)}: {added} new string(s), {todo} still to translate or review")
+        print(f"{_code(po)}: {added} new, {removed} removed, {todo} still to translate or review")
     if not _po_files():
         print("No languages yet. Start one with: python tools/i18n.py new <code>   (e.g. es_419, pt_BR)")
     return 0

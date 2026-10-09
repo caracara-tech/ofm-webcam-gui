@@ -23,7 +23,7 @@ class CameraThread(QThread):
     frame_ready = pyqtSignal(np.ndarray, float)
     error_occurred = pyqtSignal(str, str)  # (kind, message)
 
-    def __init__(self, device_index: int, width: int, height: int, backend_flag: Optional[int], target_fps: int = 30):
+    def __init__(self, device_index: int, width: int, height: int, backend_flag: int, target_fps: int = 30):
         super().__init__()
         self.device_index = device_index
         self.width = width
@@ -39,7 +39,7 @@ class CameraThread(QThread):
             if cap is None or not cap.isOpened():
                 self.error_occurred.emit(
                     ERR_NOT_DETECTED,
-                    _("Could not open camera at index {index}. Try a different device index or backend.").format(
+                    _("Could not open the camera (device index {index}). Try a different device or backend.").format(
                         index=self.device_index
                     ),
                 )
@@ -90,13 +90,12 @@ class CameraThread(QThread):
             self.error_occurred.emit(ERR_OTHER, str(exc))
 
     def _open_capture(self) -> Optional[cv2.VideoCapture]:
-        if self.backend_flag is None:
-            return cv2.VideoCapture(self.device_index)
+        """Open exactly the backend the user chose; no silent fallback to another one."""
         cap = cv2.VideoCapture(self.device_index, self.backend_flag)
         if cap.isOpened():
             return cap
         cap.release()
-        return cv2.VideoCapture(self.device_index)  # fallback to Auto
+        return None
 
     def stop(self) -> None:
         self._running = False

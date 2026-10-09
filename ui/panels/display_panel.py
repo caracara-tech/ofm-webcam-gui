@@ -15,10 +15,11 @@ from typing import Optional
 
 from PyQt5.QtCore import Qt, pyqtSignal
 from PyQt5.QtWidgets import (
-    QCheckBox, QDoubleSpinBox, QGridLayout, QGroupBox, QLabel, QSpinBox, QToolButton, QWidget,
+    QCheckBox, QComboBox, QDoubleSpinBox, QGridLayout, QGroupBox, QLabel, QSpinBox, QToolButton, QWidget,
 )
 
 from core.i18n import _
+from core.overlays import ScaleBarColor
 
 DEFAULT_GRID_SPACING_PX = 40
 DEFAULT_UM_PER_PIXEL = 1.0
@@ -51,7 +52,16 @@ class DisplayPanel(QGroupBox):
 
         self.scale_bar_check = QCheckBox(_("Show scale bar"))
         self.scale_bar_check.toggled.connect(self.scale_bar_toggled.emit)
-        layout.addWidget(self.scale_bar_check, row, 0, 1, 2)
+        layout.addWidget(self.scale_bar_check, row, 0)
+
+        # White or black bar: pick whichever reads better on the sample.
+        self.scale_bar_color_combo = QComboBox()
+        self.scale_bar_color_combo.addItem(_("White"), ScaleBarColor.WHITE.value)
+        self.scale_bar_color_combo.addItem(_("Black"), ScaleBarColor.BLACK.value)
+        self.scale_bar_color_combo.setToolTip(_("Scale bar color"))
+        self.scale_bar_color_combo.setEnabled(False)
+        self.scale_bar_check.toggled.connect(self.scale_bar_color_combo.setEnabled)
+        layout.addWidget(self.scale_bar_color_combo, row, 1)
         row += 1
 
         scale_hint = QLabel(
@@ -127,6 +137,10 @@ class DisplayPanel(QGroupBox):
     @property
     def show_scale_bar(self) -> bool:
         return self.scale_bar_check.isChecked()
+
+    @property
+    def scale_bar_color(self) -> ScaleBarColor:
+        return ScaleBarColor(self.scale_bar_color_combo.currentData())
 
     @property
     def um_per_pixel_override(self) -> Optional[float]:

@@ -8,8 +8,9 @@ source, see the [README](../README.md).
 
 PyInstaller does not cross-compile: build the Windows `.exe` on Windows and the
 Linux binary on Linux. Both use the same `packaging/ofm_webcam_gui.spec`. Run
-from the repository root; each script creates its own `venv`, installs the
-platform requirements plus PyInstaller, and builds a single-file executable.
+from any folder (the scripts switch to the repository root themselves); each
+script creates its own `venv`, installs the platform requirements plus
+PyInstaller, and builds a single-file executable.
 
 | Platform | Command | Output |
 |---|---|---|

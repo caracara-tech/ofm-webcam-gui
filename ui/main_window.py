@@ -17,20 +17,21 @@ import numpy as np
 from PyQt5.QtCore import Qt, QTimer
 from PyQt5.QtGui import QImage, QPixmap
 from PyQt5.QtWidgets import (
-    QFileDialog, QHBoxLayout, QLabel, QMainWindow, QMessageBox, QStatusBar, QVBoxLayout, QWidget,
+    QFileDialog, QHBoxLayout, QLabel, QMainWindow, QMessageBox, QPushButton, QStatusBar, QVBoxLayout, QWidget,
 )
 
 from core.app_mode import AppMode
 from core.config import DEFAULT_OUTPUT_DIR
-from core.i18n import _
+from core.i18n import _, current_language
 from core.overlays import draw_grid, draw_scale_bar
 from core.version import __version__
 from hardware.abstract import StageController
-from hardware.camera_names import detect_camera_names
 from .panels.camera_panel import CameraPanel
 from .panels.capture_panel import CapturePanel
+from .desktop import open_in_file_manager
 from .panels.display_panel import DisplayPanel
 from .stage_module import StageModule
+from .startup import ModeDialog
 from .threads.camera_thread import ERR_LOST, ERR_NOT_DETECTED, CameraThread
 
 logger = logging.getLogger(__name__)
@@ -61,11 +62,11 @@ class MainWindow(QMainWindow):
 
         self.stage_module: Optional[StageModule] = None
 
-        title_suffix = {
-            AppMode.CAMERA_STAGE: _("Camera + Stage"),
-            AppMode.CAMERA_ONLY: _("Camera"),
-            AppMode.SIMULATION: _("SIMULATION"),
-        }[mode]
+        # Set when the user asks to go back to the start screen; the caller
+        # (app.py) reads it after this window closes and starts that mode.
+        self.next_mode: Optional[AppMode] = None
+
+        title_suffix = _("SIMULATION") if mode is AppMode.SIMULATION else mode.label
         self.setWindowTitle(f"{APP_TITLE} - {title_suffix}")
         self.resize(900, 700)
 
@@ -99,14 +100,19 @@ class MainWindow(QMainWindow):
         controls_layout = QVBoxLayout(controls)
         main_layout.addWidget(controls, stretch=0)
 
+        self.change_mode_btn = QPushButton(_("Change mode / language..."))
+        self.change_mode_btn.setToolTip(_("Return to the start screen to pick another mode or language"))
+        self.change_mode_btn.clicked.connect(self._change_mode)
+        controls_layout.addWidget(self.change_mode_btn)
+
         self.camera_panel = CameraPanel()
         self.camera_panel.start_stream_requested.connect(self._start_stream)
         self.camera_panel.stop_stream_requested.connect(self._stop_stream)
-        self.camera_panel.detect_names_requested.connect(self._detect_camera_names)
         controls_layout.addWidget(self.camera_panel)
 
         self.capture_panel = CapturePanel(self._output_dir)
         self.capture_panel.browse_requested.connect(self._choose_output_dir)
+        self.capture_panel.open_folder_requested.connect(self._open_output_folder)
         self.capture_panel.snapshot_requested.connect(self._save_snapshot)
         self.capture_panel.recording_toggled.connect(self._toggle_recording)
         controls_layout.addWidget(self.capture_panel)
@@ -134,42 +140,13 @@ class MainWindow(QMainWindow):
             self.stage_module.status_message.connect(self.status.showMessage)
         if self.mode is AppMode.SIMULATION:
             self.status.showMessage(_("SIMULATION MODE"))
-        elif self.mode is AppMode.CAMERA_ONLY:
-            self.status.showMessage(_("CAMERA-ONLY MODE"))
+        elif self.mode is AppMode.MANUAL:
+            self.status.showMessage(_("MANUAL MODE"))
         else:
             port = getattr(stage, "port", None)
             self.status.showMessage(_("Stage connected ({port})").format(port=port) if port else _("Stage connected"))
 
     # ----------------------------------------------------- Camera handling --
-    def _detect_camera_names(self) -> None:
-        result = detect_camera_names()
-        if not result.supported:
-            QMessageBox.information(
-                self, _("Windows only"),
-                _(
-                    "Name detection uses DirectShow and only works on Windows.\n\n"
-                    "Just try device index 0, 1, 2... in the spinbox and click "
-                    "Start Stream to find the right one."
-                ),
-            )
-            return
-        if result.error:
-            QMessageBox.information(self, _("Camera name detection"), result.error)
-            return
-        if not result.names:
-            QMessageBox.information(self, _("No cameras found"), _("No DirectShow camera devices were detected."))
-            return
-        lines = "\n".join(f"  {i}: {name}" for i, name in enumerate(result.names))
-        QMessageBox.information(
-            self, _("Detected cameras"),
-            _(
-                "Device order seen by Windows (usually matches the index used "
-                "here, regardless of which backend you stream with):\n\n{lines}\n\n"
-                "Set the Device index spinbox above to the number next to your "
-                "camera's name, then click Start Stream."
-            ).format(lines=lines),
-        )
-
     def _start_stream(self) -> None:
         device_index = self.camera_panel.device_index
         resolution = self.camera_panel.resolution
@@ -199,7 +176,7 @@ class MainWindow(QMainWindow):
 
     def _on_error(self, kind: str, message: str) -> None:
         """No modal dialog: the image box itself says what happened, so the
-        user can just change the device index and press Start Stream again."""
+        user can just pick another device or backend and press Start Stream again."""
         self._stop_stream()
         headline = {
             ERR_NOT_DETECTED: _("Camera not detected"),
@@ -242,7 +219,9 @@ class MainWindow(QMainWindow):
 
     def _draw_overlays(self, frame: np.ndarray) -> np.ndarray:
         if self.display_panel.show_scale_bar:
-            frame = draw_scale_bar(frame, self.display_panel.um_per_pixel_override)
+            frame = draw_scale_bar(
+                frame, self.display_panel.um_per_pixel_override, color=self.display_panel.scale_bar_color.bgr,
+            )
         if self.capture_panel.burn_timestamp:
             ts = datetime.now().strftime("%Y-%m-%d %H:%M:%S.%f")[:-3]
             cv2.putText(
@@ -254,7 +233,27 @@ class MainWindow(QMainWindow):
     def _toggle_recording_blink(self) -> None:
         self._recording_blink_on = not self._recording_blink_on
 
+    # ----------------------------------------------------- Back to start --
+    def _change_mode(self) -> None:
+        """Open the start screen over the running window. Choosing a mode closes
+        this window (releasing the camera and stage first); app.py then starts
+        the chosen mode. Cancelling keeps everything running as it is."""
+        language_before = current_language()
+        chosen = ModeDialog.ask(default=self.mode)
+        if chosen is None:
+            if current_language() == language_before:
+                return
+            # The language changed but no mode was picked: rebuild this window
+            # in the same mode so every text follows the new language.
+            chosen = self.mode
+        self.next_mode = chosen
+        self.close()
+
     # -------------------------------------------------------------- Export --
+    def _open_output_folder(self) -> None:
+        if not open_in_file_manager(self._output_dir):
+            self.status.showMessage(_("Could not open the folder {path}").format(path=self._output_dir))
+
     def _choose_output_dir(self) -> None:
         directory = QFileDialog.getExistingDirectory(self, _("Choose output folder"), str(self._output_dir))
         if directory:

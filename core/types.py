@@ -89,7 +89,7 @@ class Resolution:
 @dataclass(frozen=True)
 class CameraBackend:
     label: str
-    cv2_flag: Optional[int]  # None => let OpenCV choose ("Auto")
+    cv2_flag: int  # a cv2.CAP_* constant
 
 
 @dataclass

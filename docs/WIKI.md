@@ -146,16 +146,25 @@ interface, not an implementation.**
 
 ### Explicit modes, optional stage module, no silent fallback
 
-The user picks an `AppMode` at launch (`core/app_mode.py`): Camera +
-Stage, Camera only, or Simulation. `ui/startup.py` turns that choice into
+The user picks an `AppMode` at launch (`core/app_mode.py`): Automated
+(camera + real stage), Manual (camera only), or Simulation. Simulation is
+command-line only: `AppMode.offered_at_startup` keeps it out of the start
+screen. `ui/startup.py` turns that choice into
 a `Session(mode, stage)`: a real stage via `connect_real_stage()` (which
 *raises* `StageCommunicationError` with a user-readable message if the
 board can't be reached), a `MockStageController`, or `None`.
 `MainWindow` receives the result and builds `StageModule` only if there
-is a stage, so camera-only mode contains no stage code paths to guard.
+is a stage, so manual mode contains no stage code paths to guard.
 Failures are reported, never hidden: at startup the user gets
 Retry / Choose another mode / Quit, and at runtime `StageModule` shows an
 error dialog once and disables the stage controls.
+
+The start screen is not only for launch: `MainWindow._change_mode()` shows it
+over the running window, and if a mode is chosen it sets `next_mode` and
+closes (releasing the camera and the stage port first). `app.run_sessions()`
+loops, starting the next session, so switching mode or language never closes
+the program. Cancelling keeps the current session; changing only the language
+rebuilds the window in the same mode.
 
 ### Composition over inheritance, and a thin `MainWindow`
 
@@ -260,9 +269,10 @@ in real-world distance on every different piece of hardware.
 ### `core/config.py` — defaults and option lists
 
 - **`platform_backends()`** —> which OpenCV capture backends to offer, for
-  the current OS.
-- **`default_backend_index()`**, **`default_backend_position()`** —> which
-  backend the dropdown should pre-select.
+  the current OS. There is no automatic choice: the user picks one, and a
+  backend that fails to open is reported, not silently replaced.
+- **`default_backend_position()`** —> which backend the dropdown should
+  pre-select (the platform profile's `default_backend`).
 - **`default_stage_port()`**, **`default_arduino_port()`** —> default
   serial ports (`COM*` on Windows, `/dev/tty*` on Linux).
 
@@ -386,7 +396,7 @@ default is honest about what it can and can't know.
   connect-or-ask-again loop that runs before `MainWindow` exists.
 - **`StageModule`** —> owns the stage controller, `StageMovementThread`,
   position timer, `StagePanel`, and the jog/autofocus handlers; shows the
-  "connection lost" error. Not created in camera-only mode.
+  "connection lost" error. Not created in manual mode.
 
 ### `hardware/stage/{sangaboard,arduino,mock}.py` — concrete backends
 
@@ -405,12 +415,14 @@ Each implements the same `StageController` contract:
 `set_position()` / `_apply_step_delta()` once, shared by all three
 backends, instead of each reimplementing the same bookkeeping.
 
-### `hardware/camera_names.py` — optional Windows feature
+### `hardware/cameras.py` — which cameras exist
 
-- **`is_supported()`** —> false on any non-Windows platform, without
-  importing the Windows-only `pygrabber` dependency at all.
-- **`detect_camera_names()`** —> returns human-readable webcam names via
-  DirectShow, when supported.
+- **`list_cameras()`** —> returns a `CameraListing` of `CameraDevice(index,
+  name)`, sorted by index, for the camera dropdown. Windows: DirectShow names
+  through the optional `pygrabber` package (never imported elsewhere).
+  Linux: read from `/sys/class/video4linux`, skipping the extra metadata
+  nodes a camera exposes. If nothing can be listed, `note` says why and the
+  UI falls back to generic "Camera N" entries.
 
 ### `ui/threads/camera_thread.py` — continuous frame capture
 
@@ -454,20 +466,23 @@ backends, instead of each reimplementing the same bookkeeping.
 
 ### `ui/panels/*.py` — self-contained UI widgets
 
-- **`CameraPanel`** —> device index / resolution / backend selection,
-  Start/Stop; exposes `device_index()`, `resolution()`, `backend()`.
-- **`CapturePanel`** —> snapshot/recording controls and output directory;
-  exposes `burn_timestamp()`, `set_recording()`, `set_output_dir_text()`.
+- **`CameraPanel`** —> camera dropdown (by name, with a refresh button),
+  resolution and backend selection, Start/Stop; exposes `device_index`,
+  `resolution`, `backend` and `refresh_devices()`.
+- **`CapturePanel`** —> output folder row (path, Browse, Open folder),
+  snapshot/recording buttons and the timestamp toggle under them; exposes
+  `burn_timestamp`, `set_recording()`, `set_output_dir_text()`. Opening the
+  folder goes through `ui/desktop.py::open_in_file_manager()`.
 - **`StagePanel`** —> jog buttons, step/speed settings, live position
   readout, Autofocus button; exposes `update_position_display()`,
   `set_jog_enabled()`, `set_enabled_all()` (used to disable controls
   while a move or autofocus sweep is in flight).
 - **`DisplayPanel`** - preview-overlay controls: grid toggle + spacing,
-  scale bar toggle, and a collapsed-by-default **Advanced** section
+  scale bar toggle with a white/black colour choice, and a collapsed-by-default **Advanced** section
   holding an optional physical `um_per_pixel` override (`None` unless the
   user explicitly enables it). Like the other panels, it only collects
   input and exposes properties (`show_grid`, `show_scale_bar`,
-  `um_per_pixel_override`); the actual drawing lives in
+  `scale_bar_color`, `um_per_pixel_override`); the actual drawing lives in
   `core/overlays.py`. The advanced section starts hidden via
   `self.advanced_frame.setVisible(False)`, toggled by a `QToolButton`
   rather than a full custom collapsible-group-box widget - simplest

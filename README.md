@@ -26,14 +26,14 @@ stages).
 
 ```
 ofm-webcam-gui/
-├── app.py                      # Entry point: python app.py [--mode camera-stage|camera|simulation] [--stage-port PORT] [--lang CODE] [--log-level DEBUG]
+├── app.py                      # Entry point: python app.py [--mode manual|automated|simulation] [--stage-port PORT] [--lang CODE] [--log-level DEBUG]
 ├── pyproject.toml              # Package metadata + dependencies (optional: pip install .)
 ├── requirements/               # Dependency lists per platform (base / windows / linux; i18n for translators)
 ├── core/                       # Framework-agnostic types, config, and math (no Qt, no cv2 I/O)
 │   ├── types.py                #   Axis, Direction, Position, AxisCalibration, Resolution, ...
 │   ├── version.py              #   The application version
 │   ├── platform_info.py        #   Platform detection + per-OS defaults (PlatformProfile)
-│   ├── app_mode.py             #   AppMode enum: camera-stage / camera-only / simulation
+│   ├── app_mode.py             #   AppMode enum: manual / automated / simulation
 │   ├── i18n.py                 #   Interface-language runtime
 │   ├── locales/                #   Translation catalogs
 │   ├── config.py               #   Resolutions, backend lists, default ports, default output folder
@@ -43,7 +43,7 @@ ofm-webcam-gui/
 │   └── scale_calibration.py    #   validate_um_per_pixel(), optional physical override for the scale bar
 ├── hardware/                   # Hardware abstraction layer (no PyQt imports)
 │   ├── abstract.py             #   StageController / CameraController / SensorController ABCs
-│   ├── camera_names.py         #   Windows-only (pygrabber) camera name detection
+│   ├── cameras.py              #   Lists connected cameras by name (Windows: pygrabber, Linux: sysfs)
 │   ├── errors.py               #   StageCommunicationError
 │   └── stage/
 │       ├── __init__.py         #   connect_real_stage() (raises on failure) / create_mock_stage()
@@ -76,7 +76,7 @@ All platform-specific decisions, default backend, default serial port,
 whether camera-name detection is available, are resolved by
 `core/platform_info.py` at runtime; nothing else in the codebase calls
 `platform.system()` directly. `requirements/` is split into `base.txt`
-(shared), `windows.txt` (adds `pygrabber` for camera-name detection), and
+(shared), `windows.txt` (adds `pygrabber` so cameras are listed by name), and
 `linux.txt` (omits it, since it can't be installed on Linux).
 
 ---
@@ -113,7 +113,7 @@ groups        # should list "dialout"
 ls -l /dev/ttyACM0   # or whichever port your stage is on
 ```
 
-Without this, Camera + Stage mode cannot open the port and shows an explicit
+Without this, Automated mode cannot open the port and shows an explicit
 error at startup (with a hint about this group); see
 [Troubleshooting](#troubleshooting) below.
 
@@ -123,39 +123,50 @@ error at startup (with a hint about this group); see
 
 ```bash
 python app.py                       # asks which mode to start in
-python app.py --mode camera-stage   # skip the dialog
-python app.py --mode camera
-python app.py --mode simulation
+python app.py --mode automated      # skip the dialog
+python app.py --mode manual
+python app.py --mode simulation     # command line only, not in the dialog
 python app.py --stage-port COM5     # force the stage's serial port
 python app.py --lang es_419         # interface language for this run (English, Spanish)
 python app.py --log-level DEBUG
 python app.py --help                # modes, features and examples
 ```
 
-On launch you choose one of three modes (or skip the dialog with `--mode`):
+On launch you choose a mode in the start screen (or skip it with `--mode`):
 
 | Mode | For | Stage controls | Behaviour |
 |---|---|---|---|
-| **Camera + Stage** | Full motorized microscope | Shown, real hardware | If the stage can't be reached at startup you get an error with *Retry / Choose another mode / Quit*. If it stops responding while running, an explicit error is shown and the stage controls are disabled. |
-| **Camera only** | Device without motors | Hidden | Camera device index/backend/resolution, snapshots and recording only. |
-| **Simulation** | No hardware at all | Shown, simulated stage | Nothing physical moves; the window title ends in `SIMULATION`. |
+| **Automated** | Full motorized microscope | Shown, real hardware | If the stage can't be reached at startup you get an error with *Retry / Choose another mode / Quit*. If it stops responding while running, an explicit error is shown and the stage controls are disabled. |
+| **Manual** | Device without motors | Hidden | Camera selection, snapshots and recording only. |
+| **Simulation** | Trying the software without hardware | Shown, simulated stage | Command line only (`--mode simulation` or `--simulate`); not listed in the start screen. Nothing physical moves; the window title ends in `SIMULATION`. |
+
+To switch mode or language later, click **Change mode / language...** at the
+top of the controls: it returns to the start screen without closing the
+program. Cancel keeps the current session running. It is also the way to
+reconnect after a stage error.
 
 In every mode, if the camera can't be opened the image box says
-**Camera not detected**; change the device index and press Start Stream
-again. `--simulate` still works as an alias for `--mode simulation`.
+**Camera not detected**; pick another device or backend from the dropdowns and
+press Start Stream again.
 
 ### Controls
 
-1. **Camera** —> pick device index, backend, resolution, then Start Stream.
+1. **Camera** —> pick the camera by name, the backend and the resolution, then
+   Start Stream. The refresh button (↻) rereads the camera list after you plug
+   one in.
 2. **Snapshots & Recording** —> PNG snapshots or MP4 recording, saved to
    `gallery/` by default when running from the repository (`~/Pictures/ofm-webcam-gui`
-   for the executables and pip installs), configurable via Browse.
+   for the executables and pip installs). **Browse** picks another folder and
+   **Open folder** shows the current one in your file manager so you can look
+   through the saved files. The *Burn timestamp* option sits under the record
+   button.
 3. **Stage Control** —> U/D/L/R for XY (shown as Ar/Ab/Iz/De in Spanish), W/S for Z (focus); step sizes,
    speed, live position readout, and **Autofocus** (coarse-to-fine search
    around the current position, see [the wiki](docs/WIKI.md#coreautofocuspy--the-autofocus-search-as-pure-math)
    for how it works).
 4. **Display** —> an alignment grid (preview only, never saved) and a
-   scale bar (baked into snapshots/recordings). By default the scale bar
+   scale bar (baked into snapshots/recordings, drawn in white or black, your
+   choice). By default the scale bar
    reads in **pixels** (e.g. "100 px"), fully automatic, computed
    straight from the image, no setup required. An **Advanced** section
    (collapsed by default) lets you override it with a real physical
@@ -166,7 +177,7 @@ again. `--simulate` still works as an alias for `--mode simulation`.
 
 ## Configuration
 
-Stage port: Camera + Stage mode tries the platform default port first
+Stage port: Automated mode tries the platform default port first
 (`DEFAULT_STAGE_PORT_WINDOWS` / `DEFAULT_STAGE_PORT_LINUX` in `core/config.py`),
 then scans all serial ports. Force one with `--stage-port`, or pass `port=` to
 `connect_real_stage()` / `SangaboardStageController()` in code. The Arduino
@@ -200,16 +211,18 @@ framing and relative comparisons.
 - **Arduino stage** (alternative, code only): default port `COM12`. Requires
   `pyserial`. Not selectable from the mode dialog; see
   [Configuration](#configuration). Same `dialout` group requirement on Linux.
-- **Camera name detection** (Windows only, optional): `pip install pygrabber`,
-  then use the "Detect Camera Names" button.
+- **Camera names** in the device dropdown: on Windows they come from the
+  `pygrabber` package (installed by `requirements/windows.txt`); on Linux they
+  are read from the system, no extra package. Without names, the dropdown
+  lists generic "Camera 0, 1, ..." entries.
 
 ---
 
 ## Troubleshooting
 
-**Camera won't start** —> try a different device index; switch backend from
-Media Foundation to DirectShow (Windows); check no other app is using the
-camera; confirm drivers are installed.
+**Camera won't start** —> pick a different device in the list (↻ refreshes
+it); switch backend from Media Foundation to DirectShow (Windows); check no
+other app is using the camera; confirm drivers are installed.
 
 **Stage not connecting on Linux (error at startup)** —>
 almost always a `dialout` group / permissions issue; see
@@ -222,8 +235,8 @@ serial ports the computer can see.
 Manager and pass it with `--stage-port COM5`; confirm `sangaboard` is
 installed; close any other program that may hold the port.
 
-**"Camera not detected" in the image box** —> try another device index and
-press Start Stream again; close other apps that use the camera.
+**"Camera not detected" in the image box** —> pick another device or backend
+and press Start Stream again; close other apps that use the camera.
 
 **Interface stays in English** —> `python app.py --lang es_419`; the language
 selector only appears in the startup dialog when a translation is installed.

@@ -19,13 +19,13 @@ msgstr ""
 "Content-Transfer-Encoding: 8bit\n"
 "Generated-By: Babel 2.18.0\n"
 
-#: core/app_mode.py ui/main_window.py
-msgid "Camera + Stage"
-msgstr "Cámara + Platina"
+#: core/app_mode.py
+msgid "Automated"
+msgstr "Automatizado"
 
 #: core/app_mode.py
-msgid "Camera only"
-msgstr "Solo cámara"
+msgid "Manual"
+msgstr "Manual"
 
 #: core/app_mode.py
 msgid "Simulation"
@@ -56,9 +56,14 @@ msgctxt "language name"
 msgid "English"
 msgstr "Español (Latinoamérica)"
 
-#: hardware/camera_names.py
-msgid "The optional 'pygrabber' package is not installed (pip install pygrabber)."
-msgstr "El paquete opcional 'pygrabber' no está instalado (pip install pygrabber)."
+#: hardware/cameras.py
+msgid "Camera names need the optional 'pygrabber' package (pip install pygrabber)."
+msgstr "Los nombres de las cámaras requieren el paquete opcional 'pygrabber' (pip install pygrabber)."
+
+#: hardware/cameras.py ui/panels/camera_panel.py
+#, python-brace-format
+msgid "Camera {index}"
+msgstr "Cámara {index}"
 
 #: hardware/stage/sangaboard.py
 msgid "The 'sangaboard' Python package is not installed (pip install sangaboard)."
@@ -117,10 +122,6 @@ msgstr "No se encontró ningún puerto serial. ¿La placa está conectada y ence
 msgid "Serial ports visible to this computer: {ports}"
 msgstr "Puertos seriales visibles en este equipo: {ports}"
 
-#: ui/main_window.py ui/panels/camera_panel.py
-msgid "Camera"
-msgstr "Cámara"
-
 #: ui/main_window.py
 msgid "SIMULATION"
 msgstr "SIMULACIÓN"
@@ -130,12 +131,20 @@ msgid "Camera stopped"
 msgstr "Cámara detenida"
 
 #: ui/main_window.py
+msgid "Change mode / language..."
+msgstr "Cambiar modo / idioma..."
+
+#: ui/main_window.py
+msgid "Return to the start screen to pick another mode or language"
+msgstr "Volver a la pantalla de inicio para elegir otro modo o idioma"
+
+#: ui/main_window.py
 msgid "SIMULATION MODE"
 msgstr "MODO SIMULACIÓN"
 
 #: ui/main_window.py
-msgid "CAMERA-ONLY MODE"
-msgstr "MODO SOLO CÁMARA"
+msgid "MANUAL MODE"
+msgstr "MODO MANUAL"
 
 #: ui/main_window.py
 #, python-brace-format
@@ -145,56 +154,6 @@ msgstr "Platina conectada ({port})"
 #: ui/main_window.py
 msgid "Stage connected"
 msgstr "Platina conectada"
-
-#: ui/main_window.py
-msgid "Windows only"
-msgstr "Solo Windows"
-
-#: ui/main_window.py
-msgid ""
-"Name detection uses DirectShow and only works on Windows.\n"
-"\n"
-"Just try device index 0, 1, 2... in the spinbox and click Start Stream to find the right one."
-msgstr ""
-"La detección de nombres usa DirectShow y solo funciona en Windows.\n"
-"\n"
-"Basta con probar los índices de dispositivo 0, 1, 2... en el cuadro numérico y presionar Iniciar "
-"transmisión hasta encontrar el correcto."
-
-#: ui/main_window.py
-msgid "Camera name detection"
-msgstr "Detección de nombres de cámaras"
-
-#: ui/main_window.py
-msgid "No cameras found"
-msgstr "No se encontraron cámaras"
-
-#: ui/main_window.py
-msgid "No DirectShow camera devices were detected."
-msgstr "No se detectó ningún dispositivo de cámara DirectShow."
-
-#: ui/main_window.py
-msgid "Detected cameras"
-msgstr "Cámaras detectadas"
-
-#: ui/main_window.py
-#, python-brace-format
-msgid ""
-"Device order seen by Windows (usually matches the index used here, regardless of which backend "
-"you stream with):\n"
-"\n"
-"{lines}\n"
-"\n"
-"Set the Device index spinbox above to the number next to your camera's name, then click Start "
-"Stream."
-msgstr ""
-"Orden de dispositivos que ve Windows (normalmente coincide con el índice usado aquí, sin importar"
-" con qué backend se transmita):\n"
-"\n"
-"{lines}\n"
-"\n"
-"Ajuste el índice del dispositivo, arriba, al número que aparece junto al nombre de su cámara y "
-"luego presione Iniciar transmisión."
 
 #: ui/main_window.py
 msgid "Streaming..."
@@ -220,6 +179,11 @@ msgstr "Error de la cámara"
 #, python-brace-format
 msgid "Frame {count} | {fps:.1f} fps"
 msgstr "Fotograma {count} | {fps:.1f} fps"
+
+#: ui/main_window.py
+#, python-brace-format
+msgid "Could not open the folder {path}"
+msgstr "No se pudo abrir la carpeta {path}"
 
 #: ui/main_window.py
 msgid "Choose output folder"
@@ -290,15 +254,15 @@ msgstr "Error de comunicación con la platina"
 msgid ""
 "{detail}\n"
 "\n"
-"Stage controls have been disabled. Check the USB cable and the board's power, then restart the "
-"application to reconnect.\n"
+"Stage controls have been disabled. Check the USB cable and the board's power, then use \"Change "
+"mode / language...\" (or restart the application) to reconnect.\n"
 "\n"
 "The position shown may no longer match the real stage position."
 msgstr ""
 "{detail}\n"
 "\n"
 "Los controles de la platina se han desactivado. Revise el cable USB y la alimentación de la "
-"placa; luego reinicie la aplicación para reconectar.\n"
+"placa; luego use \"Cambiar modo / idioma...\" (o reinicie la aplicación) para reconectar.\n"
 "\n"
 "La posición mostrada podría ya no coincidir con la posición real de la platina."
 
@@ -319,8 +283,8 @@ msgid "Stage not available"
 msgstr "Platina no disponible"
 
 #: ui/startup.py
-msgid "Camera + Stage mode needs the stage board. What would you like to do?"
-msgstr "El modo Cámara + Platina necesita la placa de la platina. ¿Qué desea hacer?"
+msgid "Automated mode needs the stage board. What would you like to do?"
+msgstr "El modo Automatizado necesita la placa de la platina. ¿Qué desea hacer?"
 
 #: ui/startup.py
 msgid "Retry"
@@ -335,12 +299,16 @@ msgid "Quit"
 msgstr "Salir"
 
 #: ui/panels/camera_panel.py
-msgid "Device index:"
-msgstr "Índice del dispositivo:"
+msgid "Camera"
+msgstr "Cámara"
 
 #: ui/panels/camera_panel.py
-msgid "Detect Camera Names"
-msgstr "Detectar nombres de cámaras"
+msgid "Device:"
+msgstr "Dispositivo:"
+
+#: ui/panels/camera_panel.py
+msgid "Refresh camera list"
+msgstr "Actualizar lista de cámaras"
 
 #: ui/panels/camera_panel.py
 msgid "Backend:"
@@ -371,8 +339,12 @@ msgid "Browse"
 msgstr "Examinar"
 
 #: ui/panels/capture_panel.py
-msgid "Burn timestamp into frame"
-msgstr "Marca de tiempo en el fotograma"
+msgid "Open folder"
+msgstr "Abrir carpeta"
+
+#: ui/panels/capture_panel.py
+msgid "Open this folder in the file manager"
+msgstr "Abrir esta carpeta en el administrador de archivos"
 
 #: ui/panels/capture_panel.py
 msgid "Save Snapshot (PNG)"
@@ -381,6 +353,10 @@ msgstr "Guardar captura (PNG)"
 #: ui/panels/capture_panel.py
 msgid "Start Recording (.mp4)"
 msgstr "Iniciar grabación (.mp4)"
+
+#: ui/panels/capture_panel.py
+msgid "Burn timestamp into frame"
+msgstr "Marca de tiempo en el fotograma"
 
 #: ui/panels/capture_panel.py
 msgid "Stop Recording"
@@ -397,6 +373,18 @@ msgstr "Mostrar cuadrícula"
 #: ui/panels/display_panel.py
 msgid "Show scale bar"
 msgstr "Mostrar barra de escala"
+
+#: ui/panels/display_panel.py
+msgid "White"
+msgstr "Blanco"
+
+#: ui/panels/display_panel.py
+msgid "Black"
+msgstr "Negro"
+
+#: ui/panels/display_panel.py
+msgid "Scale bar color"
+msgstr "Color de la barra de escala"
 
 #: ui/panels/display_panel.py
 msgid ""
@@ -498,8 +486,8 @@ msgstr "Error de enfoque automático: {error}"
 
 #: ui/threads/camera_thread.py
 #, python-brace-format
-msgid "Could not open camera at index {index}. Try a different device index or backend."
-msgstr "No se pudo abrir la cámara en el índice {index}. Pruebe con otro índice de dispositivo o backend."
+msgid "Could not open the camera (device index {index}). Try a different device or backend."
+msgstr "No se pudo abrir la cámara (índice de dispositivo {index}). Pruebe con otro dispositivo o backend."
 
 #: ui/threads/camera_thread.py
 #, python-brace-format

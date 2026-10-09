@@ -1,7 +1,7 @@
 """Everything stage-related, bundled so MainWindow can simply not create it.
 
 Owns the stage controller, the movement thread, the position poll timer,
-the StagePanel widget and the jog/autofocus handlers. In camera-only mode
+the StagePanel widget and the jog/autofocus handlers. In manual mode
 this class is never instantiated, so there is no stage code to guard.
 
 Failure policy: if the stage stops answering (cable pulled, board reset),
@@ -194,7 +194,8 @@ class StageModule(QObject):
             _(
                 "{detail}\n\n"
                 "Stage controls have been disabled. Check the USB cable and the "
-                "board's power, then restart the application to reconnect.\n\n"
+                "board's power, then use \"Change mode / language...\" (or restart the "
+                "application) to reconnect.\n\n"
                 "The position shown may no longer match the real stage position."
             ).format(detail=detail),
         )

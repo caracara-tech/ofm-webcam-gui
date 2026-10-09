@@ -46,45 +46,35 @@ class PlatformProfile:
     (Debian-based) build lives in one of these."""
 
     platform: Platform
-    default_backend_index: int          # index into core.config.BACKENDS
+    default_backend: Optional[int]      # cv2.CAP_* constant preselected in the UI (None: first listed)
     default_stage_port: str
     default_arduino_port: str
-    supports_camera_name_detection: bool  # pygrabber (Windows only)
-    preferred_cv2_backend: Optional[int]  # used for the "Auto" fallback probe order
 
 
 _PROFILES = {
     Platform.WINDOWS: PlatformProfile(
         platform=Platform.WINDOWS,
-        default_backend_index=1,  # Media Foundation
+        default_backend=cv2.CAP_MSMF,
         default_stage_port="COM5",
         default_arduino_port="COM12",
-        supports_camera_name_detection=True,
-        preferred_cv2_backend=cv2.CAP_MSMF,
     ),
     Platform.LINUX: PlatformProfile(
         platform=Platform.LINUX,
-        default_backend_index=3,  # V4L2
+        default_backend=cv2.CAP_V4L2,
         default_stage_port="/dev/ttyACM0",
         default_arduino_port="/dev/ttyACM0",
-        supports_camera_name_detection=False,
-        preferred_cv2_backend=cv2.CAP_V4L2,
     ),
     Platform.MACOS: PlatformProfile(
         platform=Platform.MACOS,
-        default_backend_index=0,  # Auto
+        default_backend=cv2.CAP_AVFOUNDATION,
         default_stage_port="/dev/tty.usbmodem",
         default_arduino_port="/dev/tty.usbmodem",
-        supports_camera_name_detection=False,
-        preferred_cv2_backend=None,
     ),
     Platform.UNKNOWN: PlatformProfile(
         platform=Platform.UNKNOWN,
-        default_backend_index=0,
+        default_backend=None,
         default_stage_port="",
         default_arduino_port="",
-        supports_camera_name_detection=False,
-        preferred_cv2_backend=None,
     ),
 }
 

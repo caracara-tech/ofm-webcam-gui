@@ -1,4 +1,4 @@
-"""Launch-time flow: pick an operating mode and, for Camera + Stage, connect the stage.
+"""Launch-time flow: pick an operating mode and, for Automated mode, connect the stage.
 
 Runs before MainWindow exists, so a stage that cannot be reached is
 reported explicitly (retry / pick another mode / quit) instead of the app
@@ -26,14 +26,15 @@ from .language import apply_language, save_language
 @dataclass
 class Session:
     mode: AppMode
-    stage: Optional[StageController]  # None only in camera-only mode
+    stage: Optional[StageController]  # None only in manual mode
 
 
 class ModeDialog(QDialog):
-    """Three big buttons, one per AppMode, plus a language selector (shown
-    only when more than one language is installed). Closing the window cancels."""
+    """One big button per mode offered at startup (Manual and Automated;
+    simulation is command-line only), plus a language selector shown only when
+    more than one language is installed. Closing the window cancels."""
 
-    def __init__(self, default: AppMode = AppMode.CAMERA_STAGE) -> None:
+    def __init__(self, default: AppMode = AppMode.AUTOMATED) -> None:
         super().__init__()
         self.setMinimumWidth(460)
         self.selected: Optional[AppMode] = None
@@ -43,7 +44,7 @@ class ModeDialog(QDialog):
         layout.addWidget(self.heading)
 
         self.buttons: dict[AppMode, QPushButton] = {}
-        for mode in (AppMode.CAMERA_STAGE, AppMode.CAMERA_ONLY, AppMode.SIMULATION):
+        for mode in (AppMode.AUTOMATED, AppMode.MANUAL):
             btn = QPushButton()
             btn.setStyleSheet("text-align: left; padding: 10px;")
             btn.clicked.connect(lambda _checked=False, m=mode: self._choose(m))
@@ -90,8 +91,8 @@ class ModeDialog(QDialog):
         self.accept()
 
     @classmethod
-    def ask(cls) -> Optional[AppMode]:
-        dialog = cls()
+    def ask(cls, default: AppMode = AppMode.AUTOMATED) -> Optional[AppMode]:
+        dialog = cls(default)
         dialog.exec_()
         return dialog.selected
 
@@ -99,7 +100,7 @@ class ModeDialog(QDialog):
 def _ask_after_stage_failure(message: str) -> str:
     """Returns 'retry', 'change' or 'quit'."""
     box = QMessageBox(QMessageBox.Critical, _("Stage not available"), message)
-    box.setInformativeText(_("Camera + Stage mode needs the stage board. What would you like to do?"))
+    box.setInformativeText(_("Automated mode needs the stage board. What would you like to do?"))
     retry = box.addButton(_("Retry"), QMessageBox.AcceptRole)
     change = box.addButton(_("Choose another mode"), QMessageBox.ActionRole)
     quit_btn = box.addButton(_("Quit"), QMessageBox.RejectRole)
@@ -127,7 +128,7 @@ def resolve_session(requested: Optional[AppMode], stage_port: Optional[str] = No
 
         if mode is AppMode.SIMULATION:
             return Session(mode, create_mock_stage())
-        if mode is AppMode.CAMERA_ONLY:
+        if mode is AppMode.MANUAL:
             return Session(mode, None)
 
         QApplication.setOverrideCursor(Qt.WaitCursor)
