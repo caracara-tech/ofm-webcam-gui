@@ -1,8 +1,34 @@
 [project]
 name = "ofm-webcam-gui"
-version = "0.1.0"
+dynamic = ["version"]  # defined once, in core/version.py
 description = "PyQt5 + OpenCV webcam viewer with optional precision-stage control"
 requires-python = ">=3.11"
+dependencies = [
+    "PyQt5>=5.15.0",
+    "opencv-python-headless>=4.5.0",
+    "numpy>=1.19.0",
+    "pyserial>=3.5",
+    "sangaboard>=0.1.0",
+    "pygrabber>=0.1.0; sys_platform == 'win32'",  # Windows-only camera names
+]
+
+[project.optional-dependencies]
+# Only for working on translations (tools/i18n.py); the app itself needs nothing extra.
+i18n = ["babel>=2.12"]
+
+[project.scripts]
+ofm-webcam-gui = "app:main"
+
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
 
 [tool.setuptools]
-packages = ["ofm_webcam_gui", "ofm_webcam_gui.core", "ofm_webcam_gui.hardware", "ofm_webcam_gui.hardware.stage", "ofm_webcam_gui.ui", "ofm_webcam_gui.ui.panels", "ofm_webcam_gui.ui.threads"]
+py-modules = ["app"]
+packages = ["core", "hardware", "hardware.stage", "ui", "ui.panels", "ui.threads"]
+
+[tool.setuptools.dynamic]
+version = {attr = "core.version.__version__"}
+
+[tool.setuptools.package-data]
+core = ["locales/*/LC_MESSAGES/*.mo"]

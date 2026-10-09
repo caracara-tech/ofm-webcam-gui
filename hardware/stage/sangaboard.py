@@ -7,8 +7,11 @@ import time
 from typing import Callable, Optional
 
 from core.config import SANGABOARD_MAX_STEPS_PER_SEC, default_stage_port
+from core.i18n import _
+from core.platform_info import CURRENT_PLATFORM, Platform
 from core.types import AxisCalibration, Direction
 from hardware.abstract import StageController
+from hardware.errors import StageCommunicationError
 from ._position_tracking import PositionTrackingMixin
 
 logger = logging.getLogger(__name__)
@@ -30,6 +33,7 @@ class SangaboardStageController(PositionTrackingMixin, StageController):
 
     def __init__(self, port: Optional[str] = None, timeout: float = 2):
         super().__init__(calibration=SANGABOARD_CALIBRATION, min_step_delay_us=SANGABOARD_MIN_STEP_DELAY_US)
+        self._explicit_port = port is not None
         self.port = port or default_stage_port()
         self.timeout = timeout
         self.sb = None
@@ -37,17 +41,35 @@ class SangaboardStageController(PositionTrackingMixin, StageController):
         self._x = self._y = self._z = 0
 
     def connect(self) -> None:
+        """Open the Sangaboard, or raise StageCommunicationError.
+
+        With no explicit port, the platform's default port is tried first;
+        if that fails, the `sangaboard` library scans every serial port
+        (port=None) so a different COM/tty number doesn't matter.
+        """
         if Sangaboard is None:
-            logger.warning("Sangaboard library not available.")
-            return
-        try:
-            self.sb = Sangaboard(port=self.port, timeout=self.timeout)
+            raise StageCommunicationError(
+                _("The 'sangaboard' Python package is not installed (pip install sangaboard).")
+            )
+
+        candidates = [self.port] if self._explicit_port else [self.port, None]
+        errors: list[Exception] = []
+        for candidate in candidates:
+            try:
+                self.sb = Sangaboard(port=candidate, timeout=self.timeout)
+            except Exception as e:
+                logger.warning("Could not connect to Sangaboard (port=%s): %s", candidate or "auto-scan", e)
+                errors.append(e)
+                self.sb = None
+                continue
             self._connected = True
-            logger.info("Sangaboard connected on %s", self.port)
-        except Exception as e:
-            logger.warning("Could not connect to Sangaboard at %s: %s", self.port, e)
-            self._connected = False
-            self.sb = None
+            used = getattr(getattr(self.sb, "_ser", None), "port", None) or candidate or self.port
+            self.port = used
+            logger.info("Sangaboard connected on %s", used)
+            return
+
+        self._connected = False
+        raise StageCommunicationError(_explain_connection_failure(self.port, self._explicit_port, errors, scanned=len(candidates) > 1))
 
     def disconnect(self) -> None:
         if self.sb:
@@ -77,8 +99,7 @@ class SangaboardStageController(PositionTrackingMixin, StageController):
         callback: Optional[Callable[[], None]],
     ) -> None:
         if not self.is_connected():
-            logger.warning("Sangaboard not connected")
-            return
+            raise StageCommunicationError(_("The stage is not connected."))
 
         self._stop_requested = False
         dx = dy = dz = 0
@@ -111,6 +132,13 @@ class SangaboardStageController(PositionTrackingMixin, StageController):
                 callback()
         except Exception as e:
             logger.error("Error during Sangaboard move: %s", e)
+            self._connected = False
+            raise StageCommunicationError(
+                _(
+                    "Lost communication with the stage during a move ({error}). "
+                    "Check the USB cable and the board's power."
+                ).format(error=e)
+            ) from e
         finally:
             self._apply_step_delta(direction, actual_steps)
 
@@ -125,6 +153,7 @@ class SangaboardStageController(PositionTrackingMixin, StageController):
             return True
         except Exception as e:
             logger.error("Error setting step delay on Sangaboard: %s", e)
+            self._connected = False
             return False
 
     def stop(self) -> bool:
@@ -141,3 +170,44 @@ class SangaboardStageController(PositionTrackingMixin, StageController):
                 logger.error("Error stopping Sangaboard: %s", e)
                 return False
         return True
+
+
+def _explain_connection_failure(port: str, explicit: bool, errors: list[Exception], scanned: bool) -> str:
+    """Build a user-facing explanation, distinguishing the common causes."""
+    try:
+        from serial.tools import list_ports
+        visible = [f"{p.device} ({p.description})" for p in list_ports.comports()]
+    except Exception:
+        visible = []
+
+    # The first error is the one for the configured/default port; the generic
+    # "no valid port" text from the automatic scan is not useful to the user.
+    detail = str(errors[0]) if errors else _("no response")
+    lines = [
+        _("Could not connect to the Sangaboard on {port}.").format(port=port),
+        _("Reason: {reason}").format(reason=detail),
+    ]
+    if scanned:
+        lines.append(_("An automatic scan of the other serial ports did not find a Sangaboard either."))
+
+    # Decide by exception type, never by the OS message text: that text is
+    # localized (a Spanish Windows says "Acceso denegado"), but the exception
+    # class name and errno are not.
+    denied = any(
+        isinstance(e, PermissionError) or getattr(e, "errno", None) == 13 or "PermissionError" in str(e)
+        for e in errors
+    )
+    if denied:
+        if CURRENT_PLATFORM == Platform.LINUX:
+            lines.append(_(
+                "The port exists but could not be opened. Another program may be using it, "
+                "or your user is not in the 'dialout' group "
+                "(sudo usermod -aG dialout $USER, then log out and back in)."
+            ))
+        else:
+            lines.append(_("The port exists but could not be opened. Another program may be using it."))
+    elif not visible:
+        lines.append(_("No serial ports were found at all. Is the board plugged in and powered?"))
+    else:
+        lines.append(_("Serial ports visible to this computer: {ports}").format(ports=", ".join(visible)))
+    return "\n".join(lines)

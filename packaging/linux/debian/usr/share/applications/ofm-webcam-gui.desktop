@@ -1,0 +1,9 @@
+[Desktop Entry]
+Type=Application
+Name=OFM Webcam Viewer
+Comment=Webcam viewer with OFM stage control
+Comment[es]=Visor de cámara con control de platina OFM
+Exec=/usr/bin/ofm-webcam-gui
+Icon=ofm-webcam-gui
+Terminal=false
+Categories=Science;Graphics;

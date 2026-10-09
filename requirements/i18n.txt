@@ -1,0 +1,6 @@
+# Only needed to WORK ON translations (tools/i18n.py): extracting strings,
+# updating/compiling catalogs, running the checks. Not needed to run or
+# develop the application: the app only uses Python's built-in gettext and
+# ships compiled catalogs. Install with:
+#     pip install -r requirements/i18n.txt
+babel>=2.12

@@ -10,6 +10,10 @@ built the way it is, not just how to run it.
 - [Software engineering concepts used in this project](#software-engineering-concepts-used-in-this-project)
 - [Key functions by module](#key-functions-by-module)
 
+Related guides: [BUILDING.md](BUILDING.md) (executables and packaging),
+[TRANSLATING.md](TRANSLATING.md) (interface languages) and the
+[README](../README.md) (install and run).
+
 ---
 
 ## How to explore this codebase without getting lost
@@ -48,9 +52,11 @@ shortest and has no real serial I/O to distract you, to see how that
 contract gets fulfilled. You don't need to read `arduino.py` and
 `sangaboard.py` in detail on a first pass; they follow the same shape.
 
-Then read `hardware/stage/__init__.py`'s `create_stage_controller()`,
-one function, but it's the answer to "how does the app decide whether
-it's talking to real hardware or a simulation?"
+Then read `ui/startup.py`'s `resolve_session()` and
+`hardware/stage/__init__.py`'s `connect_real_stage()` / `create_mock_stage()`.
+Together they answer "how does the app decide whether it's talking to
+real hardware, a simulation, or no stage at all?" (the user picks an
+`AppMode` at launch; nothing is auto-detected or silently swapped).
 
 ### 4. Read `ui/threads/` before `ui/panels/` or `ui/main_window.py`
 
@@ -74,7 +80,7 @@ By now every piece it wires together is already familiar, so
 `MainWindow` reads as "plumbing", connecting panel signals to thread
 slots, rather than a wall of unfamiliar logic. This is intentional: a
 thin `MainWindow` is a *goal* of the architecture, not an accident (see
-[Composition over inheritance](#composition-over-inheritance-and-a-thin-main_window) below).
+[Composition over inheritance](#composition-over-inheritance-and-a-thin-mainwindow) below).
 
 ### If you just want to trace one feature end-to-end
 
@@ -83,12 +89,12 @@ faster for building a mental model than reading files in isolation:
 
 - **"What happens when I click a Z-jog button?"** →
   `ui/panels/stage_panel.py` (emits `jog_requested`) →
-  `ui/main_window.py::_on_jog_requested` →
+  `ui/stage_module.py::StageModule._on_jog_requested` →
   `core/stage_motion.py::plan_jog` (pure math) →
   `ui/threads/stage_thread.py::StageMovementThread.add_movement` →
   `hardware/stage/sangaboard.py::_move_steps_raw` (actual serial I/O).
 - **"What happens when I click Autofocus?"** →
-  `ui/main_window.py::_run_autofocus` →
+  `ui/stage_module.py::StageModule._run_autofocus` →
   `ui/threads/autofocus_thread.py::AutoFocusThread.run` →
   `core/autofocus.py::plan_autofocus_sweep` / `focus_score` / `best_offset`
   (pure math) → back to the stage controller for the actual moves.
@@ -105,7 +111,8 @@ just a project changelog.
 
 The codebase is split into three layers, `core`, `hardware` and `ui`, with
 a strict rule: **a layer may only import from layers below it.**
-`core` imports nothing project-specific. `hardware` may import `core` but
+`core` imports nothing project-specific. `hardware` may import `core` (for
+example `core.i18n`, so hardware error messages can be translated) but
 never `ui`. `ui` may import both. This is why, for example, you can run
 `plan_jog()` from `core/stage_motion.py` in a bare Python shell with no
 GUI or serial port anywhere near your machine, it has nothing to import
@@ -137,18 +144,27 @@ This is the same idea as a device driver in an operating system, or
 `Comparable`/interfaces in typed languages generally: **program to an
 interface, not an implementation.**
 
-### The Factory pattern + graceful hardware fallback
+### Explicit modes, optional stage module, no silent fallback
 
-`hardware/stage/__init__.py::create_stage_controller()` is a small
-*factory function*: instead of `MainWindow` deciding "try to import
-Sangaboard's driver, try to open the port, catch the exception, fall
-back to a mock" inline, that whole policy lives in one function that
-returns a ready-to-use controller (real or simulated) plus metadata
-about which one you got and why. `MainWindow` just calls it and doesn't
-need to know stage brands exist. This also means the fallback logic
-itself is testable in isolation, and reusable if a second entry point
-(a CLI tool, a test harness) ever needs the same "try real hardware,
-fall back to simulation" behavior.
+The user picks an `AppMode` at launch (`core/app_mode.py`): Automated
+(camera + real stage), Manual (camera only), or Simulation. Simulation is
+command-line only: `AppMode.offered_at_startup` keeps it out of the start
+screen. `ui/startup.py` turns that choice into
+a `Session(mode, stage)`: a real stage via `connect_real_stage()` (which
+*raises* `StageCommunicationError` with a user-readable message if the
+board can't be reached), a `MockStageController`, or `None`.
+`MainWindow` receives the result and builds `StageModule` only if there
+is a stage, so manual mode contains no stage code paths to guard.
+Failures are reported, never hidden: at startup the user gets
+Retry / Choose another mode / Quit, and at runtime `StageModule` shows an
+error dialog once and disables the stage controls.
+
+The start screen is not only for launch: `MainWindow._change_mode()` shows it
+over the running window, and if a mode is chosen it sets `next_mode` and
+closes (releasing the camera and the stage port first). `app.run_sessions()`
+loops, starting the next session, so switching mode or language never closes
+the program. Cancelling keeps the current session; changing only the language
+rebuilds the window in the same mode.
 
 ### Composition over inheritance, and a thin `MainWindow`
 
@@ -253,9 +269,10 @@ in real-world distance on every different piece of hardware.
 ### `core/config.py` — defaults and option lists
 
 - **`platform_backends()`** —> which OpenCV capture backends to offer, for
-  the current OS.
-- **`default_backend_index()`**, **`default_backend_position()`** —> which
-  backend the dropdown should pre-select.
+  the current OS. There is no automatic choice: the user picks one, and a
+  backend that fails to open is reported, not silently replaced.
+- **`default_backend_position()`** —> which backend the dropdown should
+  pre-select (the platform profile's `default_backend`).
 - **`default_stage_port()`**, **`default_arduino_port()`** —> default
   serial ports (`COM*` on Windows, `/dev/tty*` on Linux).
 
@@ -350,13 +367,36 @@ default is honest about what it can and can't know.
   contracts for camera/sensor hardware (arm, exposure, gain, ROI, frame
   acquisition), used for non-webcam camera hardware if/when added.
 
-### `hardware/stage/__init__.py` — hardware selection policy
+### `hardware/stage/__init__.py` — stage factories
 
-- **`create_stage_controller(*, simulate, port, timeout) -> StageInitResult`**
-  —> the one place that decides real-vs-simulated hardware: tries a real
-  `SangaboardStageController` connection, transparently falls back to
-  `MockStageController` if it can't connect (or if simulation was
-  explicitly requested), and reports which happened.
+- **`connect_real_stage(port, timeout) -> SangaboardStageController`**
+  —> connects to a real Sangaboard (platform default port first, then an
+  automatic port scan) and raises `StageCommunicationError` on failure.
+  Never falls back to simulation.
+- **`create_mock_stage() -> MockStageController`** —> the simulated stage.
+
+### `core/i18n.py`, `ui/language.py`, `tools/i18n.py` — interface language
+
+- **`core/i18n.py`** (stdlib `gettext` only, no Qt, no extra dependency):
+  `_()`, `ngettext()`, `pgettext()`, `N_()` and `set_language()`. English
+  source text is the message id, so missing translations fall back to
+  English. Languages are discovered from `core/locales/*/LC_MESSAGES/*.mo`
+  and carry their own name inside the catalog, so adding one needs no code.
+- **`ui/language.py`** —> the Qt side: remembers the choice (QSettings) and
+  switches Qt's built-in texts (OK/Cancel, file dialogs) to the same language.
+- **`tools/i18n.py`** —> translator tooling (extract/update/new/compile/check),
+  the only code that needs Babel. The app never imports it.
+- The language is fixed for a run (chosen in the startup dialog or `--lang`),
+  which lets the UI size itself once and avoids retranslating live widgets.
+- Full workflow and style guide: [TRANSLATING.md](TRANSLATING.md).
+
+### `ui/startup.py` and `ui/stage_module.py`
+
+- **`ModeDialog` / `resolve_session()`** —> mode picker and the
+  connect-or-ask-again loop that runs before `MainWindow` exists.
+- **`StageModule`** —> owns the stage controller, `StageMovementThread`,
+  position timer, `StagePanel`, and the jog/autofocus handlers; shows the
+  "connection lost" error. Not created in manual mode.
 
 ### `hardware/stage/{sangaboard,arduino,mock}.py` — concrete backends
 
@@ -375,12 +415,14 @@ Each implements the same `StageController` contract:
 `set_position()` / `_apply_step_delta()` once, shared by all three
 backends, instead of each reimplementing the same bookkeeping.
 
-### `hardware/camera_names.py` — optional Windows feature
+### `hardware/cameras.py` — which cameras exist
 
-- **`is_supported()`** —> false on any non-Windows platform, without
-  importing the Windows-only `pygrabber` dependency at all.
-- **`detect_camera_names()`** —> returns human-readable webcam names via
-  DirectShow, when supported.
+- **`list_cameras()`** —> returns a `CameraListing` of `CameraDevice(index,
+  name)`, sorted by index, for the camera dropdown. Windows: DirectShow names
+  through the optional `pygrabber` package (never imported elsewhere).
+  Linux: read from `/sys/class/video4linux`, skipping the extra metadata
+  nodes a camera exposes. If nothing can be listed, `note` says why and the
+  UI falls back to generic "Camera N" entries.
 
 ### `ui/threads/camera_thread.py` — continuous frame capture
 
@@ -389,6 +431,10 @@ backends, instead of each reimplementing the same bookkeeping.
   the capture loop itself off the GUI thread.
 - **`_open_capture()`** —> builds the `cv2.VideoCapture` with the chosen
   backend/resolution.
+- **`error_occurred(kind, message)`** —> emitted when the camera can't be
+  opened (`not_detected`), stops delivering frames (`lost`), or fails
+  otherwise (`other`); `MainWindow._on_error()` turns the kind into the
+  headline shown in the image box.
 - **`stop()`** —> signals the loop to exit and releases the device.
 
 ### `ui/threads/stage_thread.py` — queued stage moves
@@ -398,6 +444,9 @@ backends, instead of each reimplementing the same bookkeeping.
   GUI thread.
 - **`run()`** —> processes the queue, issuing moves via the connected
   `StageController` and reporting completion back via signals.
+- **`movement_complete(message, direction)`** / **`movement_failed(message,
+  direction)`** —> success vs. a `StageCommunicationError`; the latter makes
+  `StageModule` show the error dialog and disable the stage controls.
 - **`stop()`** —> drains/stops the queue cleanly.
 
 ### `ui/threads/autofocus_thread.py` — the autofocus sweep, run against real hardware
@@ -405,7 +454,9 @@ backends, instead of each reimplementing the same bookkeeping.
 - **`AutoFocusThread.run()`** —> orchestrates the coarse-to-fine search
   described above: repeated coarse passes (expanding the search window
   on an edge-hit or a weak-signal result) followed by one fine pass,
-  reporting progress and a final result message via signals.
+  reporting progress and a final result message via signals. If the stage
+  stops answering it emits `stage_failed` (handled like a failed jog) before
+  the final message.
 - **`_run_one_sweep(plan)`** —> executes one sweep (coarse or fine): moves
   to the start of the window, samples+scores a frame at each position,
   returns to the best-scoring one.
@@ -415,20 +466,23 @@ backends, instead of each reimplementing the same bookkeeping.
 
 ### `ui/panels/*.py` — self-contained UI widgets
 
-- **`CameraPanel`** —> device index / resolution / backend selection,
-  Start/Stop; exposes `device_index()`, `resolution()`, `backend()`.
-- **`CapturePanel`** —> snapshot/recording controls and output directory;
-  exposes `burn_timestamp()`, `set_recording()`, `set_output_dir_text()`.
+- **`CameraPanel`** —> camera dropdown (by name, with a refresh button),
+  resolution and backend selection, Start/Stop; exposes `device_index`,
+  `resolution`, `backend` and `refresh_devices()`.
+- **`CapturePanel`** —> output folder row (path, Browse, Open folder),
+  snapshot/recording buttons and the timestamp toggle under them; exposes
+  `burn_timestamp`, `set_recording()`, `set_output_dir_text()`. Opening the
+  folder goes through `ui/desktop.py::open_in_file_manager()`.
 - **`StagePanel`** —> jog buttons, step/speed settings, live position
   readout, Autofocus button; exposes `update_position_display()`,
   `set_jog_enabled()`, `set_enabled_all()` (used to disable controls
   while a move or autofocus sweep is in flight).
 - **`DisplayPanel`** - preview-overlay controls: grid toggle + spacing,
-  scale bar toggle, and a collapsed-by-default **Advanced** section
+  scale bar toggle with a white/black colour choice, and a collapsed-by-default **Advanced** section
   holding an optional physical `um_per_pixel` override (`None` unless the
   user explicitly enables it). Like the other panels, it only collects
   input and exposes properties (`show_grid`, `show_scale_bar`,
-  `um_per_pixel_override`); the actual drawing lives in
+  `scale_bar_color`, `um_per_pixel_override`); the actual drawing lives in
   `core/overlays.py`. The advanced section starts hidden via
   `self.advanced_frame.setVisible(False)`, toggled by a `QToolButton`
   rather than a full custom collapsible-group-box widget - simplest
@@ -454,17 +508,19 @@ contain camera/stage/autofocus *logic* itself. Notable methods:
   instead of the automatic pixel one) and the burned-in timestamp. Used
   by both the recording path (in `_on_frame`) and snapshot saving, so a
   saved PNG and a saved video frame get identical treatment.
-- **`_on_jog_requested(direction)`** -> calls `plan_jog()`, then queues
-  the move on `StageMovementThread`.
-- **`_run_autofocus()`** —> constructs and starts an `AutoFocusThread`.
-- **`_on_autofocus_finished(message)`** —> cleans up the thread safely
-  (see [threading model](#threading-model-background-work-never-blocks-the-ui)
-  above) and updates the status bar/position display.
+- **`_on_error(kind, message)`** —> camera failures are shown in the image
+  box ("Camera not detected" / "Camera disconnected"), not in a modal.
+- **`StageModule._on_jog_requested(direction)`** -> calls `plan_jog()`, then
+  queues the move on `StageMovementThread`; `_run_autofocus()` constructs and
+  starts an `AutoFocusThread`; `_on_autofocus_finished(message)` cleans the
+  thread up safely (see
+  [threading model](#threading-model-background-work-never-blocks-the-ui)).
 - **`closeEvent()`** —> stops all threads and disconnects hardware before
   the window closes.
 
 ### `app.py` — entry point
 
-- **`parse_args(argv)`** —> CLI flags: `--simulate`, `--log-level`.
-- **`main()`** —> sets up logging, constructs `QApplication` and
-  `MainWindow`, runs the Qt event loop.
+- **`parse_args(argv)`** —> CLI flags: `--mode`, `--stage-port`, `--log-level` (`--simulate` kept as an alias).
+- **`main()`** —> sets up logging, constructs `QApplication`, resolves the
+  session (mode dialog / stage connection), builds `MainWindow`, runs the
+  Qt event loop.

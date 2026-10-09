@@ -15,8 +15,11 @@ from typing import Optional
 
 from PyQt5.QtCore import Qt, pyqtSignal
 from PyQt5.QtWidgets import (
-    QCheckBox, QDoubleSpinBox, QGridLayout, QGroupBox, QLabel, QSpinBox, QToolButton, QWidget,
+    QCheckBox, QComboBox, QDoubleSpinBox, QGridLayout, QGroupBox, QLabel, QSpinBox, QToolButton, QWidget,
 )
+
+from core.i18n import _
+from core.overlays import ScaleBarColor
 
 DEFAULT_GRID_SPACING_PX = 40
 DEFAULT_UM_PER_PIXEL = 1.0
@@ -31,11 +34,11 @@ class DisplayPanel(QGroupBox):
     um_per_pixel_override_changed = pyqtSignal(object)
 
     def __init__(self, parent=None):
-        super().__init__("Display", parent)
+        super().__init__(_("Display"), parent)
         layout = QGridLayout(self)
         row = 0
 
-        self.grid_check = QCheckBox("Show grid")
+        self.grid_check = QCheckBox(_("Show grid"))
         self.grid_check.toggled.connect(self.grid_toggled.emit)
         layout.addWidget(self.grid_check, row, 0)
 
@@ -47,14 +50,25 @@ class DisplayPanel(QGroupBox):
         layout.addWidget(self.grid_spacing_spin, row, 1)
         row += 1
 
-        self.scale_bar_check = QCheckBox("Show scale bar")
+        self.scale_bar_check = QCheckBox(_("Show scale bar"))
         self.scale_bar_check.toggled.connect(self.scale_bar_toggled.emit)
-        layout.addWidget(self.scale_bar_check, row, 0, 1, 2)
+        layout.addWidget(self.scale_bar_check, row, 0)
+
+        # White or black bar: pick whichever reads better on the sample.
+        self.scale_bar_color_combo = QComboBox()
+        self.scale_bar_color_combo.addItem(_("White"), ScaleBarColor.WHITE.value)
+        self.scale_bar_color_combo.addItem(_("Black"), ScaleBarColor.BLACK.value)
+        self.scale_bar_color_combo.setToolTip(_("Scale bar color"))
+        self.scale_bar_color_combo.setEnabled(False)
+        self.scale_bar_check.toggled.connect(self.scale_bar_color_combo.setEnabled)
+        layout.addWidget(self.scale_bar_color_combo, row, 1)
         row += 1
 
         scale_hint = QLabel(
-            "Automatic - reads in pixels (e.g. \"100 px\"), computed "
-            "directly from the image. No calibration needed."
+            _(
+                "Automatic - reads in pixels (e.g. \"100 px\"), computed "
+                "directly from the image. No calibration needed."
+            )
         )
         scale_hint.setWordWrap(True)
         layout.addWidget(scale_hint, row, 0, 1, 2)
@@ -62,7 +76,7 @@ class DisplayPanel(QGroupBox):
 
         # --- Advanced: physical-unit override, collapsed by default ----
         self.advanced_toggle_btn = QToolButton()
-        self.advanced_toggle_btn.setText("\u25b8 Advanced")
+        self.advanced_toggle_btn.setText("\u25b8 " + _("Advanced"))
         self.advanced_toggle_btn.setCheckable(True)
         self.advanced_toggle_btn.setChecked(False)
         self.advanced_toggle_btn.setToolButtonStyle(Qt.ToolButtonTextOnly)
@@ -74,7 +88,7 @@ class DisplayPanel(QGroupBox):
         adv_layout = QGridLayout(self.advanced_frame)
         adv_layout.setContentsMargins(12, 4, 0, 0)
 
-        self.override_check = QCheckBox("Override with physical calibration")
+        self.override_check = QCheckBox(_("Override with physical calibration"))
         self.override_check.toggled.connect(self._on_override_toggled)
         adv_layout.addWidget(self.override_check, 0, 0, 1, 2)
 
@@ -88,9 +102,11 @@ class DisplayPanel(QGroupBox):
         adv_layout.addWidget(self.um_per_pixel_spin, 1, 1)
 
         override_hint = QLabel(
-            "Only turn this on if you've measured a real um/pixel value "
-            "(e.g. by imaging a stage micrometer) and want the scale bar "
-            "in physical units instead of pixels."
+            _(
+                "Only turn this on if you've measured a real um/pixel value "
+                "(e.g. by imaging a stage micrometer) and want the scale bar "
+                "in physical units instead of pixels."
+            )
         )
         override_hint.setWordWrap(True)
         adv_layout.addWidget(override_hint, 2, 0, 1, 2)
@@ -100,7 +116,7 @@ class DisplayPanel(QGroupBox):
 
     def _on_advanced_toggled(self, checked: bool) -> None:
         self.advanced_frame.setVisible(checked)
-        self.advanced_toggle_btn.setText("\u25be Advanced" if checked else "\u25b8 Advanced")
+        self.advanced_toggle_btn.setText(("\u25be " if checked else "\u25b8 ") + _("Advanced"))
 
     def _on_override_toggled(self, checked: bool) -> None:
         self.um_per_pixel_spin.setEnabled(checked)
@@ -121,6 +137,10 @@ class DisplayPanel(QGroupBox):
     @property
     def show_scale_bar(self) -> bool:
         return self.scale_bar_check.isChecked()
+
+    @property
+    def scale_bar_color(self) -> ScaleBarColor:
+        return ScaleBarColor(self.scale_bar_color_combo.currentData())
 
     @property
     def um_per_pixel_override(self) -> Optional[float]:

@@ -23,13 +23,28 @@ character depending on platform.
 
 from __future__ import annotations
 
+from enum import Enum
 from typing import List, Optional
 
 import cv2
 import numpy as np
 
+
+
+class ScaleBarColor(str, Enum):
+    """The colours the user can pick for the scale bar."""
+
+    WHITE = "white"
+    BLACK = "black"
+
+    @property
+    def bgr(self) -> tuple[int, int, int]:
+        """The colour as an OpenCV (blue, green, red) tuple."""
+        return (255, 255, 255) if self is ScaleBarColor.WHITE else (0, 0, 0)
+
+
 GRID_COLOR = (0, 200, 0)
-SCALE_BAR_COLOR = (255, 255, 255)
+SCALE_BAR_COLOR = ScaleBarColor.WHITE.bgr  # default
 _NICE_MULTIPLIERS = (1.0, 2.0, 5.0)
 
 
