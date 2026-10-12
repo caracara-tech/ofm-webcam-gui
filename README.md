@@ -9,6 +9,8 @@
 [![Microscopy](https://img.shields.io/badge/application-Microscopy-F9A825)](../../)
 [![License](https://img.shields.io/badge/license-GPL--3.0-5D4037)](LICENSE)
 
+**Languages:** English | [Español](docs/es/README.es.md)
+
 A PyQt5 + OpenCV application for streaming webcam feeds and capturing
 snapshots/recordings, with optional precision XYZ stage control and
 coarse-to-fine autofocus for microscopy setups (Sangaboard or Arduino-based
@@ -67,17 +69,6 @@ ofm-webcam-gui/
 `core`. `core` and `hardware` have zero PyQt imports, so both layers can be
 unit tested or reused headlessly. See [the wiki](docs/WIKI.md) for why this
 matters and how to navigate it.
-
----
-
-## Cross-platform support (Windows + Debian-based Linux)
-
-All platform-specific decisions, default backend, default serial port,
-whether camera-name detection is available, are resolved by
-`core/platform_info.py` at runtime; nothing else in the codebase calls
-`platform.system()` directly. `requirements/` is split into `base.txt`
-(shared), `windows.txt` (adds `pygrabber` so cameras are listed by name), and
-`linux.txt` (omits it, since it can't be installed on Linux).
 
 ---
 
