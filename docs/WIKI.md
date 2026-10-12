@@ -1,4 +1,4 @@
-# OFM Webcam Viewer — Developer Wiki
+# OFM Webcam Viewer - Developer Wiki
 
 This is the deep-dive companion to the top-level [README](../README.md).
 Read this if you're new to the codebase and want to understand *why* it's
@@ -244,7 +244,7 @@ in real-world distance on every different piece of hardware.
 
 ## Key functions by module
 
-### `core/types.py` — shared vocabulary
+### `core/types.py` - shared vocabulary
 
 - **`Axis`** (`Enum`) —> `X` / `Y` / `Z`.
 - **`Direction`** (`Enum`) —> one of `LEFT/RIGHT/UP/DOWN/FORWARD/BACKWARD`;
@@ -257,7 +257,7 @@ in real-world distance on every different piece of hardware.
 - **`Resolution`**, **`CameraBackend`**, **`StageMotionSettings`** —>
   small typed value objects used throughout the UI and hardware layers.
 
-### `core/platform_info.py` — OS-aware defaults, centralized
+### `core/platform_info.py` - OS-aware defaults, centralized
 
 - **`detect_platform()`** —> returns `Platform.WINDOWS` / `.LINUX` / `.MACOS`.
 - **`PlatformProfile`** / **`current_profile()`** —> the single source of
@@ -266,7 +266,7 @@ in real-world distance on every different piece of hardware.
   in the codebase should call `platform.system()` directly, if you find
   yourself wanting to, it probably belongs here instead.
 
-### `core/config.py` — defaults and option lists
+### `core/config.py` - defaults and option lists
 
 - **`platform_backends()`** —> which OpenCV capture backends to offer, for
   the current OS. There is no automatic choice: the user picks one, and a
@@ -276,7 +276,7 @@ in real-world distance on every different piece of hardware.
 - **`default_stage_port()`**, **`default_arduino_port()`** —> default
   serial ports (`COM*` on Windows, `/dev/tty*` on Linux).
 
-### `core/stage_motion.py` — jog planning math
+### `core/stage_motion.py` - jog planning math
 
 - **`plan_jog(direction, settings, calibration, ...) -> JogPlan`** —> pure
   function: given a jog direction and the current UI step-size/speed
@@ -284,7 +284,7 @@ in real-world distance on every different piece of hardware.
   between them. No hardware or Qt involved, this is "decide what to do,"
   separate from "go do it."
 
-### `core/autofocus.py` — the autofocus search, as pure math
+### `core/autofocus.py` - the autofocus search, as pure math
 
 - **`AutoFocusSettings`** —> all tunable parameters for a sweep, in
   physical units (µm): coarse/fine range and step size, how aggressively
@@ -312,7 +312,7 @@ in real-world distance on every different piece of hardware.
   sweep whose winner sits at the very edge of the window it searched,
   meaning the true peak may lie further out in that direction.
 
-### `core/overlays.py` — preview-overlay drawing (grid + scale bar)
+### `core/overlays.py` - preview-overlay drawing (grid + scale bar)
 
 Pure input-frame-in/output-frame-out functions, same style as
 `core/autofocus.py` - no Qt, no hardware, just `cv2`/`numpy` array
@@ -344,7 +344,7 @@ default is honest about what it can and can't know.
   since OpenCV's built-in Hershey fonts don't reliably render non-ASCII
   glyphs.
 
-### `core/scale_calibration.py` — optional physical scale override
+### `core/scale_calibration.py` - optional physical scale override
 
 - **`validate_um_per_pixel(value) -> float`** - validates a user-entered
   µm/pixel override value, raising `ValueError` on a non-positive input.
@@ -355,7 +355,7 @@ default is honest about what it can and can't know.
   sample, so if supplied, it's a single fixed constant - not a function
   of Z.
 
-### `hardware/abstract.py` — the hardware contract
+### `hardware/abstract.py` - the hardware contract
 
 - **`StageController`** (ABC) —> the interface every stage backend must
   implement: `connect()`, `disconnect()`, `is_connected()`,
@@ -367,7 +367,7 @@ default is honest about what it can and can't know.
   contracts for camera/sensor hardware (arm, exposure, gain, ROI, frame
   acquisition), used for non-webcam camera hardware if/when added.
 
-### `hardware/stage/__init__.py` — stage factories
+### `hardware/stage/__init__.py` - stage factories
 
 - **`connect_real_stage(port, timeout) -> SangaboardStageController`**
   —> connects to a real Sangaboard (platform default port first, then an
@@ -375,7 +375,7 @@ default is honest about what it can and can't know.
   Never falls back to simulation.
 - **`create_mock_stage() -> MockStageController`** —> the simulated stage.
 
-### `core/i18n.py`, `ui/language.py`, `tools/i18n.py` — interface language
+### `core/i18n.py`, `ui/language.py`, `tools/i18n.py` - interface language
 
 - **`core/i18n.py`** (stdlib `gettext` only, no Qt, no extra dependency):
   `_()`, `ngettext()`, `pgettext()`, `N_()` and `set_language()`. English
@@ -398,7 +398,7 @@ default is honest about what it can and can't know.
   position timer, `StagePanel`, and the jog/autofocus handlers; shows the
   "connection lost" error. Not created in manual mode.
 
-### `hardware/stage/{sangaboard,arduino,mock}.py` — concrete backends
+### `hardware/stage/{sangaboard,arduino,mock}.py` - concrete backends
 
 Each implements the same `StageController` contract:
 
@@ -415,7 +415,7 @@ Each implements the same `StageController` contract:
 `set_position()` / `_apply_step_delta()` once, shared by all three
 backends, instead of each reimplementing the same bookkeeping.
 
-### `hardware/cameras.py` — which cameras exist
+### `hardware/cameras.py` - which cameras exist
 
 - **`list_cameras()`** —> returns a `CameraListing` of `CameraDevice(index,
   name)`, sorted by index, for the camera dropdown. Windows: DirectShow names
@@ -424,7 +424,7 @@ backends, instead of each reimplementing the same bookkeeping.
   nodes a camera exposes. If nothing can be listed, `note` says why and the
   UI falls back to generic "Camera N" entries.
 
-### `ui/threads/camera_thread.py` — continuous frame capture
+### `ui/threads/camera_thread.py` - continuous frame capture
 
 - **`CameraThread.run()`** —> opens the capture device and continuously
   reads frames in a loop, emitting each one via a Qt signal; this keeps
@@ -437,7 +437,7 @@ backends, instead of each reimplementing the same bookkeeping.
   headline shown in the image box.
 - **`stop()`** —> signals the loop to exit and releases the device.
 
-### `ui/threads/stage_thread.py` — queued stage moves
+### `ui/threads/stage_thread.py` - queued stage moves
 
 - **`StageMovementThread.add_movement(...)`** —> enqueues one move
   request (direction, steps, delay, status text) to be executed off the
@@ -449,7 +449,7 @@ backends, instead of each reimplementing the same bookkeeping.
   `StageModule` show the error dialog and disable the stage controls.
 - **`stop()`** —> drains/stops the queue cleanly.
 
-### `ui/threads/autofocus_thread.py` — the autofocus sweep, run against real hardware
+### `ui/threads/autofocus_thread.py` - the autofocus sweep, run against real hardware
 
 - **`AutoFocusThread.run()`** —> orchestrates the coarse-to-fine search
   described above: repeated coarse passes (expanding the search window
@@ -464,7 +464,7 @@ backends, instead of each reimplementing the same bookkeeping.
   captured *after* the most recent move finished (using a frame counter),
   rather than blindly sleeping and risking a stale, pre-move frame.
 
-### `ui/panels/*.py` — self-contained UI widgets
+### `ui/panels/*.py` - self-contained UI widgets
 
 - **`CameraPanel`** —> camera dropdown (by name, with a refresh button),
   resolution and backend selection, Start/Stop; exposes `device_index`,
@@ -488,7 +488,7 @@ backends, instead of each reimplementing the same bookkeeping.
   rather than a full custom collapsible-group-box widget - simplest
   thing that reads clearly as "click to expand."
 
-### `ui/main_window.py` — composition root
+### `ui/main_window.py` - composition root
 
 Owns the panels and threads and wires them together via signals; doesn't
 contain camera/stage/autofocus *logic* itself. Notable methods:
@@ -518,7 +518,7 @@ contain camera/stage/autofocus *logic* itself. Notable methods:
 - **`closeEvent()`** —> stops all threads and disconnects hardware before
   the window closes.
 
-### `app.py` — entry point
+### `app.py` - entry point
 
 - **`parse_args(argv)`** —> CLI flags: `--mode`, `--stage-port`, `--log-level` (`--simulate` kept as an alias).
 - **`main()`** —> sets up logging, constructs `QApplication`, resolves the
