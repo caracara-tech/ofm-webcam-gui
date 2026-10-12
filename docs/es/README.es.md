@@ -171,6 +171,9 @@ En cualquier modo, si no se puede abrir la cámara, el área de imagen mostrará
 
 ---
 
+## Uso de IA
+Se utilizaron herramientas de IA como apoyo en la generación de código, depuración, refactorización y documentación. Todo el código debe revisarse y validarse, independientemente de su origen. Este proyecto sigue una política de prohibición de agentes autónomos de IA; los agentes de IA no pueden modificar ni contribuir al código de forma independiente.
+
 ## Licencia
 
 Consulta el archivo [`LICENSE`](../../LICENSE). El software se proporciona tal cual, para uso educativo y de laboratorio.

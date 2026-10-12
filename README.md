@@ -247,6 +247,10 @@ confirm Python 3.11+.
 
 ---
 
+## AI Usage Disclaimer
+
+AI tools were used to assist with code generation, debugging, refactoring, and documentation. All code must be reviewed and validated regardless of its origin. This project follows a no-autonomous-AI-agents policy; AI agents may not independently modify or contribute code.
+
 ## License
 
 See `LICENSE`. Provided as-is for laboratory and educational use.
