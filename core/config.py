@@ -47,7 +47,7 @@ RESOLUTIONS: list[Resolution] = [
 ]
 
 BACKENDS: list[CameraBackend] = [
-    CameraBackend("Media Foundation - MSMF (Windows, recommended)", cv2.CAP_MSMF),
+    CameraBackend("Media Foundation - MSMF (Windows)", cv2.CAP_MSMF),
     CameraBackend("DirectShow - DSHOW (Windows, fallback)", cv2.CAP_DSHOW),
     CameraBackend("V4L2 (Linux)", cv2.CAP_V4L2),
     CameraBackend("AVFoundation (macOS)", cv2.CAP_AVFOUNDATION),
