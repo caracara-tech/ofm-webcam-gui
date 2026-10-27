@@ -132,8 +132,8 @@ On launch you choose a mode in the start screen (or skip it with `--mode`):
 
 | Mode | For | Stage controls | Behaviour |
 |---|---|---|---|
-| **Automated** | Full motorized microscope | Shown, real hardware.
-| **Manual** | Device without motors | Camera selection, snapshots and recording only. |
+| **Automated** | Full motorized microscope | Shown, real hardware | If the stage can't be reached at startup you get an error with *Retry / Choose another mode / Quit*. If it stops responding while running, an explicit error is shown and the stage controls are disabled. |
+| **Manual** | Device without motors | Hidden | Camera selection, snapshots and recording only. |
 | **Simulation** | Trying the software without hardware | Shown, simulated stage | Command line only (`--mode simulation` or `--simulate`); not listed in the start screen. Nothing physical moves; the window title ends in `SIMULATION`. |
 
 ### Controls
