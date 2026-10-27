@@ -40,6 +40,11 @@ def detect_platform() -> Platform:
 CURRENT_PLATFORM: Platform = detect_platform()
 
 
+def describe_platform() -> str:
+    """Human-readable OS description (e.g. 'Linux-6.8.0-x86_64-with-glibc2.39'), for logs and bug reports."""
+    return platform.platform()
+
+
 @dataclass(frozen=True)
 class PlatformProfile:
     """Everything that differs between the Windows build and the Linux
@@ -48,7 +53,6 @@ class PlatformProfile:
     platform: Platform
     default_backend: Optional[int]      # cv2.CAP_* constant preselected in the UI (None: first listed)
     default_stage_port: str
-    default_arduino_port: str
 
 
 _PROFILES = {
@@ -56,25 +60,21 @@ _PROFILES = {
         platform=Platform.WINDOWS,
         default_backend=cv2.CAP_MSMF,
         default_stage_port="COM5",
-        default_arduino_port="COM12",
     ),
     Platform.LINUX: PlatformProfile(
         platform=Platform.LINUX,
         default_backend=cv2.CAP_V4L2,
         default_stage_port="/dev/ttyACM0",
-        default_arduino_port="/dev/ttyACM0",
     ),
     Platform.MACOS: PlatformProfile(
         platform=Platform.MACOS,
         default_backend=cv2.CAP_AVFOUNDATION,
         default_stage_port="/dev/tty.usbmodem",
-        default_arduino_port="/dev/tty.usbmodem",
     ),
     Platform.UNKNOWN: PlatformProfile(
         platform=Platform.UNKNOWN,
         default_backend=None,
         default_stage_port="",
-        default_arduino_port="",
     ),
 }
 

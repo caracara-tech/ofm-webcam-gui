@@ -1,9 +1,9 @@
 """
 Small internal helper shared by all concrete StageController implementations.
 
-Every backend (Arduino, Sangaboard, Mock) tracks its own logical (x, y, z) in
+Every backend (Sangaboard, Mock) tracks its own logical (x, y, z) in
 steps and needs to turn a `Direction` + step count into a position delta the
-same way. Rather than duplicate that arithmetic three times, it lives here.
+same way. Rather than duplicate that arithmetic per backend, it lives here.
 """
 
 from __future__ import annotations

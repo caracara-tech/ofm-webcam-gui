@@ -1,8 +1,8 @@
 """Top-level QMainWindow. Wires panels + background threads together.
 
 Deliberately thin: camera I/O lives in CameraThread, stage math lives in
-core.stage_motion, stage backends live in hardware.stage. This class's job
-is UI composition and event routing only.
+core.stage_motion, stage backends live in hardware.stage, log handling lives
+in core.logging_setup. This class's job is UI composition and event routing only.
 """
 
 from __future__ import annotations
@@ -20,16 +20,21 @@ from PyQt5.QtWidgets import (
     QFileDialog, QHBoxLayout, QLabel, QMainWindow, QMessageBox, QPushButton, QStatusBar, QVBoxLayout, QWidget,
 )
 
+from core.app_info import LICENSE_SPDX
 from core.app_mode import AppMode
 from core.config import DEFAULT_OUTPUT_DIR
 from core.i18n import _, current_language
+from core.logging_setup import LogSession
 from core.overlays import draw_grid, draw_scale_bar
 from core.version import __version__
-from hardware.abstract import StageController
+from hardware.stage import create_stage
+from .dialogs.about import AboutDialog
+from .dialogs.log_viewer import LogViewerDialog
 from .panels.camera_panel import CameraPanel
 from .panels.capture_panel import CapturePanel
 from .desktop import open_in_file_manager
 from .panels.display_panel import DisplayPanel
+from .panels.log_panel import LogBar
 from .stage_module import StageModule
 from .startup import ModeDialog
 from .threads.camera_thread import ERR_LOST, ERR_NOT_DETECTED, CameraThread
@@ -42,13 +47,12 @@ RECORDING_BLINK_INTERVAL_MS = 500
 
 
 class MainWindow(QMainWindow):
-    def __init__(self, mode: AppMode, stage: Optional[StageController] = None):
+    def __init__(self, mode: AppMode, log_session: LogSession, stage_port: Optional[str] = None):
         super().__init__()
-        if mode.has_stage != (stage is not None):
-            raise ValueError(
-                f"Mode {mode.value!r} {'needs' if mode.has_stage else 'does not take'} a stage controller"
-            )
         self.mode = mode
+        self._log = log_session
+        self._stage_port = stage_port
+        logger.info("Session started in %s mode", mode.value)
 
         self._output_dir = DEFAULT_OUTPUT_DIR
         self._output_dir.mkdir(parents=True, exist_ok=True)
@@ -61,6 +65,7 @@ class MainWindow(QMainWindow):
         self._recording_blink_on = False
 
         self.stage_module: Optional[StageModule] = None
+        self._log_viewer: Optional[LogViewerDialog] = None
 
         # Set when the user asks to go back to the start screen; the caller
         # (app.py) reads it after this window closes and starts that mode.
@@ -70,13 +75,18 @@ class MainWindow(QMainWindow):
         self.setWindowTitle(f"{APP_TITLE} - {title_suffix}")
         self.resize(900, 700)
 
-        self._build_ui(stage)
+        self._build_ui()
 
         self.recording_blink_timer = QTimer(self)
         self.recording_blink_timer.timeout.connect(self._toggle_recording_blink)
 
+        # Last, once every panel and signal is wired: the window is fully up
+        # and usable, and only then does the stage start looking for its board.
+        if self.stage_module is not None:
+            self.stage_module.start()
+
     # ---------------------------------------------------------------- UI ---
-    def _build_ui(self, stage: Optional[StageController]) -> None:
+    def _build_ui(self) -> None:
         central = QWidget()
         self.setCentralWidget(central)
         main_layout = QHBoxLayout(central)
@@ -117,16 +127,20 @@ class MainWindow(QMainWindow):
         self.capture_panel.recording_toggled.connect(self._toggle_recording)
         controls_layout.addWidget(self.capture_panel)
 
+        stage = create_stage(self.mode, self._stage_port)  # not connected yet; StageModule does that
         if stage is not None:
             self.stage_module = StageModule(
                 stage, self,
                 get_frame=lambda: self.last_frame,
                 get_frame_count=lambda: self.frame_count,
                 is_streaming=lambda: self.camera_thread is not None,
+                stage_is_real=self.mode.stage_is_real,
             )
             controls_layout.addWidget(self.stage_module.panel)
 
         self.display_panel = DisplayPanel()
+        # Expanding "Advanced" adds height the window does not have yet: re-fit it.
+        self.display_panel.layout_changed.connect(lambda: QTimer.singleShot(0, self._grow_to_fit))
         controls_layout.addWidget(self.display_panel)
         controls_layout.addStretch()
         # Wide enough for the longest label in the active language (translations
@@ -142,9 +156,26 @@ class MainWindow(QMainWindow):
             self.status.showMessage(_("SIMULATION MODE"))
         elif self.mode is AppMode.MANUAL:
             self.status.showMessage(_("MANUAL MODE"))
-        else:
-            port = getattr(stage, "port", None)
-            self.status.showMessage(_("Stage connected ({port})").format(port=port) if port else _("Stage connected"))
+
+        # Log and license controls live in the status bar: always one click away,
+        # and they take no height from the (already tall) controls column.
+        self.log_bar = LogBar()
+        self.log_bar.set_saving(self._log.saving)
+        self.log_bar.save_toggled.connect(self._on_save_log_toggled)
+        self.log_bar.view_requested.connect(self._show_log_viewer)
+        self.status.addPermanentWidget(self.log_bar)
+
+        self.about_btn = QPushButton(f"{_('About / License')} ({LICENSE_SPDX})")
+        self.about_btn.setToolTip(_("About this program and its license"))
+        self.about_btn.clicked.connect(self._show_about)
+        self.status.addPermanentWidget(self.about_btn)
+
+    def _grow_to_fit(self) -> None:
+        """Make the window at least as large as its content wants. (adjustSize()
+        is capped at two thirds of the screen, and a layout's minimum height
+        ignores wrapped text, so a panel that just grew would be squeezed.)"""
+        hint = self.sizeHint()
+        self.resize(max(self.width(), hint.width()), max(self.height(), hint.height()))
 
     # ----------------------------------------------------- Camera handling --
     def _start_stream(self) -> None:
@@ -154,6 +185,9 @@ class MainWindow(QMainWindow):
 
         self.video_label.setFixedSize(resolution.width, resolution.height)
         self.flash_overlay.setGeometry(self.video_label.rect())
+        logger.info(
+            "Starting camera stream: device index %d, %s, backend %s", device_index, resolution.label, backend.label,
+        )
         self.camera_thread = CameraThread(device_index, resolution.width, resolution.height, backend.cv2_flag)
         self.camera_thread.frame_ready.connect(self._on_frame)
         self.camera_thread.error_occurred.connect(self._on_error)
@@ -165,6 +199,7 @@ class MainWindow(QMainWindow):
 
     def _stop_stream(self) -> None:
         if self.camera_thread is not None:
+            logger.info("Stopping camera stream")
             self.camera_thread.stop()
             self.camera_thread = None
         if self.video_writer is not None:
@@ -177,6 +212,7 @@ class MainWindow(QMainWindow):
     def _on_error(self, kind: str, message: str) -> None:
         """No modal dialog: the image box itself says what happened, so the
         user can just pick another device or backend and press Start Stream again."""
+        logger.error("Camera error (%s): %s", kind, message)
         self._stop_stream()
         headline = {
             ERR_NOT_DETECTED: _("Camera not detected"),
@@ -246,6 +282,7 @@ class MainWindow(QMainWindow):
             # The language changed but no mode was picked: rebuild this window
             # in the same mode so every text follows the new language.
             chosen = self.mode
+        logger.info("Switching to %s mode (language: %s)", chosen.value, current_language())
         self.next_mode = chosen
         self.close()
 
@@ -265,10 +302,14 @@ class MainWindow(QMainWindow):
             self.status.showMessage(_("No frame to save yet."))
             return
         frame = self._draw_overlays(self.last_frame.copy())
-        self.snapshot_count += 1
         ts = datetime.now().strftime("%Y%m%d_%H%M%S_%f")[:-3]
         filename = self._output_dir / f"frame_{ts}.png"
-        cv2.imwrite(str(filename), frame)
+        if not cv2.imwrite(str(filename), frame):
+            logger.error("Could not write the snapshot %s", filename)
+            self.status.showMessage(_("Could not save {filename}").format(filename=filename))
+            return
+        self.snapshot_count += 1
+        logger.info("Saved snapshot %s", filename)
         self.status.showMessage(_("Saved {filename}  ({count} total)").format(filename=filename, count=self.snapshot_count))
         self._flash_snapshot()
 
@@ -288,6 +329,7 @@ class MainWindow(QMainWindow):
             path = self._output_dir / f"recording_{ts}.mp4"
             fourcc = cv2.VideoWriter_fourcc(*"mp4v")
             self.video_writer = cv2.VideoWriter(str(path), fourcc, 20.0, (w, h))
+            logger.info("Recording started: %s (%dx%d)", path, w, h)
             self.capture_panel.set_recording(True)
             self._recording_blink_on = True
             self.recording_blink_timer.start(RECORDING_BLINK_INTERVAL_MS)
@@ -295,10 +337,42 @@ class MainWindow(QMainWindow):
         else:
             self.video_writer.release()
             self.video_writer = None
+            logger.info("Recording stopped")
             self.recording_blink_timer.stop()
             self._recording_blink_on = False
             self.capture_panel.set_recording(False)
             self.status.showMessage(_("Recording stopped"))
+
+    # ------------------------------------------------------- Log and About --
+    def _on_save_log_toggled(self, saving: bool) -> None:
+        if not saving:
+            self._log.stop_saving()
+            self.log_bar.set_saving(False)
+            self.status.showMessage(_("Log file deleted; the session is still being recorded"))
+            return
+        try:
+            path = self._log.start_saving()
+        except OSError as exc:
+            logger.error("Could not open the log file: %s", exc)
+            self.log_bar.set_saving(False)
+            self.status.showMessage(_("Could not save the log: {error}").format(error=exc))
+            return
+        self.status.showMessage(_("Saving the log to {path}").format(path=path))
+
+    def _open_log_folder(self) -> None:
+        if not open_in_file_manager(self._log.folder):
+            self.status.showMessage(_("Could not open the folder {path}").format(path=self._log.folder))
+
+    def _show_log_viewer(self) -> None:
+        if self._log_viewer is None:
+            self._log_viewer = LogViewerDialog(self._log.history, self._log.read_full_log, self)
+            self._log_viewer.open_folder_requested.connect(self._open_log_folder)
+        self._log_viewer.show()
+        self._log_viewer.raise_()
+        self._log_viewer.activateWindow()
+
+    def _show_about(self) -> None:
+        AboutDialog(self).exec_()
 
     # ------------------------------------------------------------- Cleanup --
     def closeEvent(self, event) -> None:
@@ -307,4 +381,6 @@ class MainWindow(QMainWindow):
             self.recording_blink_timer.stop()
         if self.stage_module is not None:
             self.stage_module.shutdown()
+        if self._log_viewer is not None:
+            self._log_viewer.close()  # stops listening to the log before the window goes away
         event.accept()

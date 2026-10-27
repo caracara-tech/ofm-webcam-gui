@@ -25,7 +25,7 @@ build-backend = "setuptools.build_meta"
 
 [tool.setuptools]
 py-modules = ["app"]
-packages = ["core", "hardware", "hardware.stage", "ui", "ui.panels", "ui.threads"]
+packages = ["core", "hardware", "hardware.stage", "ui", "ui.dialogs", "ui.panels", "ui.threads"]
 
 [tool.setuptools.dynamic]
 version = {attr = "core.version.__version__"}

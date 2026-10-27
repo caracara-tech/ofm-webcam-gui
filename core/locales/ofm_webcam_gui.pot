@@ -7,7 +7,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: OFM Webcam Viewer 0.1.0\n"
 "Report-Msgid-Bugs-To: EMAIL@ADDRESS\n"
-"POT-Creation-Date: 2026-10-08 18:38+0000\n"
+"POT-Creation-Date: 2026-10-27 06:39+0000\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
@@ -15,6 +15,13 @@ msgstr ""
 "Content-Type: text/plain; charset=utf-8\n"
 "Content-Transfer-Encoding: 8bit\n"
 "Generated-By: Babel 2.18.0\n"
+
+#: core/app_info.py
+msgid ""
+"This program is free software, released under the GNU General Public License, version 3. You may "
+"redistribute it and/or modify it under the terms of that license. It comes with ABSOLUTELY NO "
+"WARRANTY; see the license text below."
+msgstr ""
 
 #: core/app_mode.py
 msgid "Automated"
@@ -30,8 +37,8 @@ msgstr ""
 
 #: core/app_mode.py
 msgid ""
-"Full microscope: live camera and motorized stage control. Requires the stage board to be "
-"connected."
+"Full microscope: live camera and motorized stage control. If the stage board is not found, its "
+"controls stay off until you retry."
 msgstr ""
 
 #: core/app_mode.py
@@ -134,13 +141,12 @@ msgstr ""
 msgid "MANUAL MODE"
 msgstr ""
 
-#: ui/main_window.py
-#, python-brace-format
-msgid "Stage connected ({port})"
+#: ui/dialogs/about.py ui/main_window.py
+msgid "About / License"
 msgstr ""
 
 #: ui/main_window.py
-msgid "Stage connected"
+msgid "About this program and its license"
 msgstr ""
 
 #: ui/main_window.py
@@ -183,6 +189,11 @@ msgstr ""
 
 #: ui/main_window.py
 #, python-brace-format
+msgid "Could not save {filename}"
+msgstr ""
+
+#: ui/main_window.py
+#, python-brace-format
 msgid "Saved {filename}  ({count} total)"
 msgstr ""
 
@@ -201,6 +212,59 @@ msgstr ""
 
 #: ui/main_window.py
 msgid "Recording stopped"
+msgstr ""
+
+#: ui/main_window.py
+msgid "Log file deleted; the session is still being recorded"
+msgstr ""
+
+#: ui/main_window.py
+#, python-brace-format
+msgid "Could not save the log: {error}"
+msgstr ""
+
+#: ui/main_window.py
+#, python-brace-format
+msgid "Saving the log to {path}"
+msgstr ""
+
+#: ui/stage_module.py
+msgid "Stage not detected"
+msgstr ""
+
+#: ui/stage_module.py
+msgid "Check the USB cable and the board's power, then press Retry connection."
+msgstr ""
+
+#: ui/stage_module.py
+msgid "Stage connection lost"
+msgstr ""
+
+#: ui/stage_module.py
+msgid ""
+"Stage controls have been disabled. Check the USB cable and the board's power, then press Retry "
+"connection. The position shown may no longer match the real stage position."
+msgstr ""
+
+#: ui/stage_module.py
+msgid "Connecting to the stage..."
+msgstr ""
+
+#: ui/stage_module.py
+msgid "Wait for the auto-focus to stop, then retry."
+msgstr ""
+
+#: ui/stage_module.py
+msgid "Simulated stage ready"
+msgstr ""
+
+#: ui/stage_module.py
+#, python-brace-format
+msgid "Stage connected ({port})"
+msgstr ""
+
+#: ui/stage_module.py
+msgid "Stage connected"
 msgstr ""
 
 #: ui/stage_module.py
@@ -225,29 +289,6 @@ msgstr ""
 msgid "Auto-focus: sampling position {step}/{total}..."
 msgstr ""
 
-#: ui/stage_module.py
-msgid "Stage Control — CONNECTION LOST"
-msgstr ""
-
-#: ui/stage_module.py
-msgid "Stage connection lost"
-msgstr ""
-
-#: ui/stage_module.py
-msgid "Stage communication error"
-msgstr ""
-
-#: ui/stage_module.py
-#, python-brace-format
-msgid ""
-"{detail}\n"
-"\n"
-"Stage controls have been disabled. Check the USB cable and the board's power, then use \"Change "
-"mode / language...\" (or restart the application) to reconnect.\n"
-"\n"
-"The position shown may no longer match the real stage position."
-msgstr ""
-
 #: ui/startup.py
 msgid "OFM Webcam Viewer — select mode"
 msgstr ""
@@ -260,24 +301,66 @@ msgstr ""
 msgid "Language:"
 msgstr ""
 
-#: ui/startup.py
-msgid "Stage not available"
+#: ui/dialogs/about.py
+#, python-brace-format
+msgid "Version {version}"
 msgstr ""
 
-#: ui/startup.py
-msgid "Automated mode needs the stage board. What would you like to do?"
+#: ui/dialogs/about.py
+#, python-brace-format
+msgid "The license text file was not found in this installation. The full text is at {url}"
 msgstr ""
 
-#: ui/startup.py
-msgid "Retry"
+#: ui/dialogs/about.py ui/dialogs/log_viewer.py
+msgid "Close"
 msgstr ""
 
-#: ui/startup.py
-msgid "Choose another mode"
+#: ui/dialogs/log_viewer.py
+msgid "Session log"
 msgstr ""
 
-#: ui/startup.py
-msgid "Quit"
+#: ui/dialogs/log_viewer.py
+msgid "Show:"
+msgstr ""
+
+#: ui/dialogs/log_viewer.py
+msgid "All messages"
+msgstr ""
+
+#: ui/dialogs/log_viewer.py
+msgid "Info and above"
+msgstr ""
+
+#: ui/dialogs/log_viewer.py
+msgid "Warnings and errors"
+msgstr ""
+
+#: ui/dialogs/log_viewer.py
+msgid "Errors only"
+msgstr ""
+
+#: ui/dialogs/log_viewer.py
+msgid "Save a copy..."
+msgstr ""
+
+#: ui/dialogs/log_viewer.py
+msgid "Write the whole session log (all levels) to a file of your choice"
+msgstr ""
+
+#: ui/dialogs/log_viewer.py ui/panels/capture_panel.py
+msgid "Open folder"
+msgstr ""
+
+#: ui/dialogs/log_viewer.py
+msgid "Open the log folder in the file manager"
+msgstr ""
+
+#: ui/dialogs/log_viewer.py
+msgid "Save a copy of the log"
+msgstr ""
+
+#: ui/dialogs/log_viewer.py
+msgid "Log files (*.log *.txt)"
 msgstr ""
 
 #: ui/panels/camera_panel.py
@@ -318,10 +401,6 @@ msgstr ""
 
 #: ui/panels/capture_panel.py
 msgid "Browse"
-msgstr ""
-
-#: ui/panels/capture_panel.py
-msgid "Open folder"
 msgstr ""
 
 #: ui/panels/capture_panel.py
@@ -388,6 +467,22 @@ msgid ""
 "and want the scale bar in physical units instead of pixels."
 msgstr ""
 
+#: ui/panels/log_panel.py
+msgid "Save log to file"
+msgstr ""
+
+#: ui/panels/log_panel.py
+msgid "Write everything logged in this session to a file, starting from the beginning of the session"
+msgstr ""
+
+#: ui/panels/log_panel.py
+msgid "View log..."
+msgstr ""
+
+#: ui/panels/log_panel.py
+msgid "Show the log of this session in a window"
+msgstr ""
+
 #. Jog button: move the stage up (a short abbreviation, 1-2 letters)
 #: ui/panels/stage_panel.py
 msgctxt "jog button: up"
@@ -414,6 +509,14 @@ msgstr ""
 
 #: ui/panels/stage_panel.py
 msgid "Stage Control"
+msgstr ""
+
+#: ui/panels/stage_panel.py
+msgid "Retry connection"
+msgstr ""
+
+#: ui/panels/stage_panel.py
+msgid "Try to connect to the stage again"
 msgstr ""
 
 #: ui/panels/stage_panel.py
@@ -474,5 +577,14 @@ msgstr ""
 
 #: ui/threads/camera_thread.py
 msgid "Lost connection to camera (no frame)."
+msgstr ""
+
+#: ui/threads/stage_connect_thread.py
+#, python-brace-format
+msgid "Unexpected error while connecting to the stage: {error}"
+msgstr ""
+
+#: ui/threads/stage_connect_thread.py
+msgid "The stage did not respond."
 msgstr ""
 

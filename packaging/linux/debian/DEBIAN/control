@@ -6,5 +6,5 @@ Architecture: amd64
 Maintainer: Caracara Tech <pierre@caracara.tech>
 Depends: libgl1, libxkbcommon-x11-0
 Description: OFM Webcam Viewer
- PyQt5 + OpenCV webcam viewer with optional Sangaboard/Arduino stage
+ PyQt5 + OpenCV webcam viewer with optional Sangaboard stage
  control for Open Flexure Microscope (OFM) setups.

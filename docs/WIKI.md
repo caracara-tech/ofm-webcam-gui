@@ -49,14 +49,16 @@ Read the `StageController` abstract base class in `hardware/abstract.py`
 to see the *contract* every stage backend promises to fulfill. Then read
 **one** concrete implementation, `hardware/stage/mock.py` is the
 shortest and has no real serial I/O to distract you, to see how that
-contract gets fulfilled. You don't need to read `arduino.py` and
-`sangaboard.py` in detail on a first pass; they follow the same shape.
+contract gets fulfilled. You don't need to read `sangaboard.py`
+in detail on a first pass; it follows the same shape.
 
-Then read `ui/startup.py`'s `resolve_session()` and
-`hardware/stage/__init__.py`'s `connect_real_stage()` / `create_mock_stage()`.
+Then read `hardware/stage/__init__.py`'s `create_stage()` and the connection
+part of `ui/stage_module.py` (`start()`, `_begin_connect()`, `_set_status()`).
 Together they answer "how does the app decide whether it's talking to
-real hardware, a simulation, or no stage at all?" (the user picks an
-`AppMode` at launch; nothing is auto-detected or silently swapped).
+real hardware, a simulation, or no stage at all, and what happens when the
+board isn't there?" (the user picks an `AppMode` at launch; nothing is
+auto-detected or silently swapped, and a missing board is reported in the
+status bar and the log, never decided by a dialog before the window exists).
 
 ### 4. Read `ui/threads/` before `ui/panels/` or `ui/main_window.py`
 
@@ -93,6 +95,16 @@ faster for building a mental model than reading files in isolation:
   `core/stage_motion.py::plan_jog` (pure math) →
   `ui/threads/stage_thread.py::StageMovementThread.add_movement` →
   `hardware/stage/sangaboard.py::_move_steps_raw` (actual serial I/O).
+- **"What happens when the stage board isn't plugged in?"** →
+  `app.py::run_sessions` (opens the window; nothing hardware-related happens first) →
+  `ui/main_window.py::MainWindow.__init__` (`create_stage()` builds an unconnected
+  controller, `StageModule.start()` is called last) →
+  `ui/threads/stage_connect_thread.py::StageConnectThread.run` (background
+  `connect()`) → `hardware/stage/sangaboard.py::connect` (raises
+  `StageCommunicationError` with the explanation) →
+  `ui/stage_module.py::_on_connect_failed` → `_set_status()` →
+  `ui/panels/stage_panel.py::show_status` (controls off, Retry button) plus the
+  status-bar line and the log entry.
 - **"What happens when I click Autofocus?"** →
   `ui/stage_module.py::StageModule._run_autofocus` →
   `ui/threads/autofocus_thread.py::AutoFocusThread.run` →
@@ -131,15 +143,14 @@ mock out half a GUI framework to check that the math is right.
 `hardware/abstract.py` defines `StageController` as an abstract base
 class: a contract of methods (`connect()`, `move_steps()`,
 `get_position()`, ...) that any stage must support, without saying
-*how*. `SangaboardStageController`, `ArduinoStageController`, and
-`MockStageController` each implement that same contract differently,
-one talks real serial protocol to a Sangaboard, one to an Arduino, one
-just fakes it in memory.
+*how*. `SangaboardStageController` and `MockStageController` each implement
+that same contract differently: one talks real serial protocol to a
+Sangaboard, the other just fakes it in memory.
 
 The payoff: everything above `hardware/`, the jog logic, the autofocus
 sweep and the UI, is written against `StageController`, never against a
 specific brand of hardware. Swapping which stage you're driving, or
-adding a fourth kind, never requires touching `core/` or `ui/` at all.
+adding another kind, never requires touching `core/` or `ui/` at all.
 This is the same idea as a device driver in an operating system, or
 `Comparable`/interfaces in typed languages generally: **program to an
 interface, not an implementation.**
@@ -149,15 +160,36 @@ interface, not an implementation.**
 The user picks an `AppMode` at launch (`core/app_mode.py`): Automated
 (camera + real stage), Manual (camera only), or Simulation. Simulation is
 command-line only: `AppMode.offered_at_startup` keeps it out of the start
-screen. `ui/startup.py` turns that choice into
-a `Session(mode, stage)`: a real stage via `connect_real_stage()` (which
-*raises* `StageCommunicationError` with a user-readable message if the
-board can't be reached), a `MockStageController`, or `None`.
-`MainWindow` receives the result and builds `StageModule` only if there
-is a stage, so manual mode contains no stage code paths to guard.
-Failures are reported, never hidden: at startup the user gets
-Retry / Choose another mode / Quit, and at runtime `StageModule` shows an
-error dialog once and disables the stage controls.
+screen. `ui/startup.py::choose_mode()` only returns that choice; it touches no
+hardware. `MainWindow` asks `hardware.stage.create_stage(mode, port)` for the
+matching controller (a Sangaboard, a `MockStageController`, or `None`; always
+*not yet connected*) and builds `StageModule` only if there is one, so manual
+mode contains no stage code paths to guard.
+
+### Logging: an always-on history with an optional file
+
+`core/logging_setup.py` (no Qt) installs two always-on handlers on the root
+logger at startup: a bounded in-memory `LogHistory` (what the viewer shows) and a
+temporary file that holds the *whole* session (deleted at exit, including via
+`atexit` after a crash). Saving a log is a separate sink that can be switched on
+and off while the program runs: `start_saving()` *creates* the file with the
+whole session copied from the temporary file and keeps streaming to it;
+`stop_saving()` *deletes* it, while recording continues in the temporary file, so
+saving again yields a complete file. `start_saving()` opens with mode `"x"` and
+refuses a file that already exists, which is what makes deleting on stop safe.
+Copy-and-attach happens while holding the temporary handler's lock, so no record
+falls between the copy and the stream. One level (`--log-level`) governs console,
+history, temp file and saved file.
+
+The GUI side is split the same way as the rest of the project: `LogBar` only
+emits signals (`save_toggled`, `view_requested`, ...); `MainWindow` receives the
+`LogSession` by **injection** (created in `app.py`, passed to every window, so the
+log and the file survive "Change mode / language...") and reacts;
+`LogViewerDialog` subscribes to the history and shows new lines live. A log call
+can come from any thread, so the viewer receives entries through a Qt signal
+(queued to the GUI thread) rather than touching widgets from the logging thread.
+`install_excepthook()` sends uncaught exceptions to the log, which matters for the
+windowed Windows executable (it has no console).
 
 The start screen is not only for launch: `MainWindow._change_mode()` shows it
 over the running window, and if a mode is chosen it sets `next_mode` and
@@ -182,15 +214,15 @@ is already a known quantity.
 
 Qt applications have exactly one thread allowed to touch widgets: the
 main/GUI thread. Anything slow or blocking, reading camera frames in a
-loop, waiting for a stage to finish moving, running a multi-second
-autofocus sweep, is done on a `QThread` subclass instead, which
+loop, opening the stage's serial port, waiting for a stage to finish moving,
+running a multi-second autofocus sweep, is done on a `QThread` subclass instead, which
 communicates results back to the GUI thread via **signals** (Qt's
 built-in, thread-safe publish/subscribe mechanism) rather than by
 touching widgets directly from a background thread (which would be
 undefined behavior / worse, since Qt widgets aren't thread-safe). This
-project has three: `CameraThread` (continuously grabs frames),
-`StageMovementThread` (executes queued stage moves), and
-`AutoFocusThread` (runs a focus sweep). If the UI ever "freezes" while
+project has four: `CameraThread` (continuously grabs frames),
+`StageConnectThread` (connects or reconnects the stage), `StageMovementThread`
+(executes queued stage moves), and `AutoFocusThread` (runs a focus sweep). If the UI ever "freezes" while
 something is happening, that's the sign a blocking call snuck onto the
 main thread and needs moving into one of these.
 
@@ -198,7 +230,7 @@ One subtlety worth internalizing from this project's own history: a
 `QThread` must not be destroyed by Python's garbage collector while its
 underlying OS thread is still finishing up, or Qt aborts the process.
 The safe pattern used throughout (`autofocus_thread.py`,
-`stage_thread.py`) is to connect the thread's own `finished` signal to
+`stage_thread.py`, `stage_connect_thread.py`) is to connect the thread's own `finished` signal to
 `deleteLater()`, and to `.wait()` for it before dropping the last
 reference, never just set the variable to `None` and hope the timing
 works out.
@@ -234,7 +266,7 @@ Sweep and jog distances are specified in **micrometres**
 (`AutoFocusSettings.range_um`, `StageMotionSettings.xy_step_um`, etc.),
 not in raw motor steps, and converted to steps only at the last possible
 moment using each stage's own `AxisCalibration` (nanometres-per-step,
-which differs between a Sangaboard and an Arduino stage). This is why
+which differs between stages). This is why
 the same `AutoFocusSettings()` defaults produce sensible, comparable
 physical sweeps regardless of which stage is plugged in, the
 alternative (hardcoding step counts) silently means something different
@@ -266,6 +298,43 @@ in real-world distance on every different piece of hardware.
   in the codebase should call `platform.system()` directly, if you find
   yourself wanting to, it probably belongs here instead.
 
+### `core/logging_setup.py` - session logging (no Qt)
+
+- **`configure_logging(level_name, default_dir, save, path) -> LogSession`** —>
+  installs the handlers once at startup (history always, console only if a
+  console exists, file if `save`). A log file that can't be opened is reported
+  in the log and never stops the program.
+- **`LogHistory`** (a `logging.Handler`) —> the last `HISTORY_LIMIT` formatted
+  records; `entries()` snapshots them, `subscribe(listener)` returns the backlog
+  and registers for new entries atomically (nothing missed or duplicated).
+- **`LogSession`** —> `start_saving(path=None)` (creates the file with the whole
+  session so far, then streams; raises `OSError`, e.g. if the file exists, and
+  leaves the session unchanged), `stop_saving()` (deletes the file, keeps
+  recording), `read_full_log()` (the whole session from the temporary file),
+  `saving`, `file_path`, `last_path`, `folder`, `close()` (keeps a saved file,
+  removes the temporary one).
+- **`resolve_log_path(path, default_dir)`** —> pure: nothing → timestamped file in
+  the default folder; a folder (existing, or text ending in a separator) →
+  timestamped file inside it; otherwise the path as given. Takes the raw text on
+  purpose: a `Path` has already lost the trailing separator.
+- **`install_excepthook()`**, **`describe_environment()`** —> uncaught exceptions
+  into the log; the environment line at the top of every log.
+
+### `core/device_status.py` - how a device reports itself
+
+- **`DeviceState`** —> `CONNECTING` / `CONNECTED` / `NOT_DETECTED` / `LOST`.
+- **`DeviceStatus(state, headline, description, detail)`** —> `is_ok`,
+  `can_retry`, `text()` (what a panel shows) and `one_line()` (status bar).
+
+### `core/app_info.py` - the app's own facts
+
+- **`APP_NAME`**, **`LICENSE_NAME`**, **`LICENSE_SPDX`**, **`LICENSE_URL`**,
+  **`LICENSE_NOTICE`** (translatable).
+- **`load_license_text()`** —> the full license, from the `LICENSE` file next to
+  the code (source checkout and PyInstaller builds, where the spec bundles it) or
+  else the installed package's metadata (pip); `None` if neither exists, and the
+  About dialog then shows the license URL instead.
+
 ### `core/config.py` - defaults and option lists
 
 - **`platform_backends()`** —> which OpenCV capture backends to offer, for
@@ -273,8 +342,10 @@ in real-world distance on every different piece of hardware.
   backend that fails to open is reported, not silently replaced.
 - **`default_backend_position()`** —> which backend the dropdown should
   pre-select (the platform profile's `default_backend`).
-- **`default_stage_port()`**, **`default_arduino_port()`** —> default
-  serial ports (`COM*` on Windows, `/dev/tty*` on Linux).
+- **`default_stage_port()`** —> default
+  serial port (`COM*` on Windows, `/dev/tty*` on Linux).
+- **`DEFAULT_OUTPUT_DIR`**, **`DEFAULT_LOG_DIR`** —> where captures and session
+  logs go: next to the code from a checkout, under the home folder otherwise.
 
 ### `core/stage_motion.py` - jog planning math
 
@@ -369,11 +440,17 @@ default is honest about what it can and can't know.
 
 ### `hardware/stage/__init__.py` - stage factories
 
-- **`connect_real_stage(port, timeout) -> SangaboardStageController`**
-  —> connects to a real Sangaboard (platform default port first, then an
-  automatic port scan) and raises `StageCommunicationError` on failure.
-  Never falls back to simulation.
-- **`create_mock_stage() -> MockStageController`** —> the simulated stage.
+- **`create_stage(mode, port) -> Optional[StageController]`** —> what the app
+  uses: the controller for an `AppMode`, built but *not connected* (`None` for
+  manual mode). The single place a mode is mapped to hardware.
+- **`create_real_stage(port, timeout)`** —> an unconnected Sangaboard controller.
+  Its `connect()` tries the platform default port first, then an automatic port
+  scan, and raises `StageCommunicationError` with a user-readable explanation on
+  failure. Never falls back to simulation.
+- **`connect_real_stage(port, timeout)`** —> create + connect in one blocking
+  call, for scripts (the GUI does not use it: it would freeze the window).
+- **`create_mock_stage() -> MockStageController`** —> the simulated stage,
+  already connected.
 
 ### `core/i18n.py`, `ui/language.py`, `tools/i18n.py` - interface language
 
@@ -392,20 +469,23 @@ default is honest about what it can and can't know.
 
 ### `ui/startup.py` and `ui/stage_module.py`
 
-- **`ModeDialog` / `resolve_session()`** —> mode picker and the
-  connect-or-ask-again loop that runs before `MainWindow` exists.
-- **`StageModule`** —> owns the stage controller, `StageMovementThread`,
-  position timer, `StagePanel`, and the jog/autofocus handlers; shows the
-  "connection lost" error. Not created in manual mode.
+- **`ModeDialog` / `choose_mode()`** —> the mode (and language) picker; returns
+  the mode, touches no hardware.
+- **`StageModule`** —> owns the stage controller, `StageConnectThread`,
+  `StageMovementThread`, position timer, `StagePanel`, and the jog/autofocus
+  handlers. `start()` begins connecting; `retry_connection()` reconnects;
+  `_set_status()` is the single place connection state changes;
+  `_handle_stage_failure()` turns a mid-run failure into `LOST`. Not created in
+  manual mode.
 
-### `hardware/stage/{sangaboard,arduino,mock}.py` - concrete backends
+### `hardware/stage/{sangaboard,mock}.py` - concrete backends
 
 Each implements the same `StageController` contract:
 
 - **`connect()` / `disconnect()` / `is_connected()`** —> connection
   lifecycle.
 - **`send_command(cmd)`** —> backend-specific wire protocol (serial text
-  commands for Sangaboard/Arduino; a no-op for the mock).
+  commands for Sangaboard; a no-op for the mock).
 - **`_move_steps_raw(...)`** —> the actual step-issuing primitive; this is
   the one method that's genuinely different per backend (real serial
   writes vs. an in-memory position update).
@@ -436,6 +516,13 @@ backends, instead of each reimplementing the same bookkeeping.
   otherwise (`other`); `MainWindow._on_error()` turns the kind into the
   headline shown in the image box.
 - **`stop()`** —> signals the loop to exit and releases the device.
+
+### `ui/threads/stage_connect_thread.py` - connecting without freezing the window
+
+- **`StageConnectThread(stage, reset=False)`** —> runs `stage.connect()` (after
+  `disconnect()` when `reset=True`, i.e. a retry) and emits exactly one of
+  `connected()` / `failed(message)`; `cancel()` releases the stage if the window
+  closed meanwhile.
 
 ### `ui/threads/stage_thread.py` - queued stage moves
 
@@ -474,9 +561,16 @@ backends, instead of each reimplementing the same bookkeeping.
   `burn_timestamp`, `set_recording()`, `set_output_dir_text()`. Opening the
   folder goes through `ui/desktop.py::open_in_file_manager()`.
 - **`StagePanel`** —> jog buttons, step/speed settings, live position
-  readout, Autofocus button; exposes `update_position_display()`,
-  `set_jog_enabled()`, `set_enabled_all()` (used to disable controls
-  while a move or autofocus sweep is in flight).
+  readout, Autofocus button, plus a **Retry connection** button shown only while
+  the stage is not detected or was lost (no text area: the reason goes to the
+  status bar and the log); exposes
+  `show_status(DeviceStatus)`, `update_position_display()`, `set_jog_enabled()`
+  (blocks new moves while one is in flight), `set_enabled_all()`; emits
+  `retry_requested`. The tooltip of the Retry button says what to check.
+- **`LogBar`** —> **Save log to file** checkbox and **View log...** button, small
+  enough for the status bar (the controls column is already screen-tall); emits
+  `save_toggled`, `view_requested`; `set_saving()` reflects the real state without
+  re-emitting.
 - **`DisplayPanel`** - preview-overlay controls: grid toggle + spacing,
   scale bar toggle with a white/black colour choice, and a collapsed-by-default **Advanced** section
   holding an optional physical `um_per_pixel` override (`None` unless the
@@ -488,12 +582,29 @@ backends, instead of each reimplementing the same bookkeeping.
   rather than a full custom collapsible-group-box widget - simplest
   thing that reads clearly as "click to expand."
 
+### `ui/dialogs/` - windows opened from the main window
+
+- **`LogViewerDialog(history)`** —> non-modal live log: level filter,
+  Save a copy... (the whole session, not just the lines in memory), Open folder; scrolls with new lines unless the user scrolled
+  up. Subscribes to the `LogHistory` and unsubscribes
+  when closed.
+- **`AboutDialog`** —> name, version, license notice and the full license text.
+
 ### `ui/main_window.py` - composition root
 
 Owns the panels and threads and wires them together via signals; doesn't
 contain camera/stage/autofocus *logic* itself. Notable methods:
 
-- **`_build_ui()`** -> assembles panels into the main layout.
+- **`__init__(mode, log_session, stage_port)`** -> the stage is created in
+  `_build_ui()` and `StageModule.start()` is called last, once the window is wired.
+- **`_build_ui()`** -> assembles panels into the main layout; the permanent
+  **About / License (GPL-3.0)** button sits in the status bar.
+- **`_on_save_log_toggled()` / `_show_log_viewer()` / `_open_log_folder()` /
+  `_show_about()`** -> react to `LogBar` and the About button. The status-bar
+  buttons are deliberately normal (not flat) buttons so they read as clickable,
+  unlike the status message beside them. `_grow_to_fit()` re-fits the window when
+  the Display panel's **Advanced** section expands (`adjustSize()` is capped at
+  two thirds of the screen and a layout's minimum height ignores wrapped text).
 - **`_start_stream()` / `_stop_stream()`** -> start/stop `CameraThread`.
 - **`_on_frame(frame, fps)`** -> receives frames from `CameraThread`. Calls
   `_draw_overlays()` for whatever should be baked into the saved video
@@ -520,7 +631,9 @@ contain camera/stage/autofocus *logic* itself. Notable methods:
 
 ### `app.py` - entry point
 
-- **`parse_args(argv)`** —> CLI flags: `--mode`, `--stage-port`, `--log-level` (`--simulate` kept as an alias).
-- **`main()`** —> sets up logging, constructs `QApplication`, resolves the
-  session (mode dialog / stage connection), builds `MainWindow`, runs the
-  Qt event loop.
+- **`parse_args(argv)`** —> CLI flags: `--mode`, `--stage-port`, `--lang`,
+  `--log-level`, `--save-log [PATH]` (`--simulate` kept as an alias).
+- **`main()`** —> parses, sets up logging (before any heavy import, so start-up
+  problems are logged too), then runs the app and always closes the log.
+- **`run_sessions()`** —> picks the mode (`choose_mode()`), opens a `MainWindow`
+  per session with the shared `LogSession`, loops on "Change mode / language...".

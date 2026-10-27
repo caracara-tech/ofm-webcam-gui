@@ -32,6 +32,8 @@ class DisplayPanel(QGroupBox):
     # Emits the new override value (float) when enabled/changed, or None
     # when the override is turned off (falling back to automatic pixels).
     um_per_pixel_override_changed = pyqtSignal(object)
+    # The panel grew or shrank (Advanced expanded/collapsed): the window should re-fit.
+    layout_changed = pyqtSignal()
 
     def __init__(self, parent=None):
         super().__init__(_("Display"), parent)
@@ -117,6 +119,7 @@ class DisplayPanel(QGroupBox):
     def _on_advanced_toggled(self, checked: bool) -> None:
         self.advanced_frame.setVisible(checked)
         self.advanced_toggle_btn.setText(("\u25be " if checked else "\u25b8 ") + _("Advanced"))
+        self.layout_changed.emit()
 
     def _on_override_toggled(self, checked: bool) -> None:
         self.um_per_pixel_spin.setEnabled(checked)

@@ -5,13 +5,12 @@
 [![PyQt5](https://img.shields.io/badge/UI-PyQt5-7B1FA2?logo=qt&logoColor=white)](../../)
 [![OpenCV](https://img.shields.io/badge/visión-OpenCV-C62828?logo=opencv&logoColor=white)](../../)
 [![Sangaboard](https://img.shields.io/badge/plataforma-Sangaboard-E65100)](../../)
-[![Arduino](https://img.shields.io/badge/plataforma-Arduino-00838F?logo=arduino&logoColor=white)](../../)
 [![Microscopía](https://img.shields.io/badge/aplicación-Microscopía-F9A825)](../../)
 [![Licencia](https://img.shields.io/badge/licencia-GPL--3.0-5D4037)](../../LICENSE)
 
 **Idiomas:** [English](../../README.md) | Español
 
-Aplicación desarrollada con PyQt5 y OpenCV para visualizar imágenes de cámaras web y capturar fotografías y grabaciones, con control opcional de una plataforma de precisión XYZ y enfoque automático de búsqueda gruesa a fina para sistemas de microscopía (basadas en Sangaboard o Arduino).
+Aplicación desarrollada con PyQt5 y OpenCV para visualizar imágenes de cámaras web y capturar fotografías y grabaciones, con control opcional de una plataforma de precisión XYZ y enfoque automático de búsqueda gruesa a fina para sistemas de microscopía (basadas en Sangaboard).
 
 > **Más documentación:** la [wiki para desarrolladores](../WIKI.md) explica la arquitectura y las funciones principales; [BUILDING.md](../BUILDING.md) describe cómo generar ejecutables, paquetes `.deb` e instalar mediante pip; [TRANSLATING.md](../TRANSLATING.md) explica cómo gestionar los idiomas de la interfaz.
 >
@@ -23,7 +22,8 @@ Aplicación desarrollada con PyQt5 y OpenCV para visualizar imágenes de cámara
 
 ```text
 ofm-webcam-gui/
-├── app.py                      # Punto de entrada: python app.py [--mode manual|automated|simulation] [--stage-port PORT] [--lang CODE] [--log-level DEBUG]
+├── app.py                      # Punto de entrada: python app.py [--mode manual|automated|simulation] [--stage-port PORT] [--lang CODE] [--log-level DEBUG] [--save-log [PATH]]
+├── LICENSE                     # Licencia Pública General de GNU v3 (también se muestra en la aplicación: About / License)
 ├── pyproject.toml              # Metadatos del paquete y dependencias (opcional: pip install .)
 ├── requirements/               # Listas de dependencias por plataforma (base / windows / linux; i18n para traductores)
 ├── core/                       # Tipos, configuración y cálculos independientes del framework (sin Qt ni E/S de cv2)
@@ -31,6 +31,9 @@ ofm-webcam-gui/
 │   ├── version.py              #   Versión de la aplicación
 │   ├── platform_info.py        #   Detección de plataforma y valores predeterminados por sistema operativo (PlatformProfile)
 │   ├── app_mode.py             #   Enum AppMode: manual / automated / simulation
+│   ├── app_info.py             #   Nombre de la aplicación, datos de la licencia, load_license_text()
+│   ├── device_status.py        #   DeviceState / DeviceStatus: cómo informa un dispositivo "conectando / conectado / no detectado / perdido"
+│   ├── logging_setup.py        #   Registro de la sesión: historial en memoria, archivo de registro opcional, captura de excepciones no controladas
 │   ├── i18n.py                 #   Gestión de los idiomas de la interfaz durante la ejecución
 │   ├── locales/                #   Catálogos de traducción
 │   ├── config.py               #   Resoluciones, listas de backends, puertos predeterminados y carpeta de salida
@@ -43,18 +46,18 @@ ofm-webcam-gui/
 │   ├── cameras.py              #   Lista cámaras conectadas por nombre (Windows: pygrabber; Linux: sysfs)
 │   ├── errors.py               #   StageCommunicationError
 │   └── stage/
-│       ├── __init__.py         #   connect_real_stage() (genera una excepción si falla) / create_mock_stage()
-│       ├── arduino.py          #   ArduinoStageController
+│       ├── __init__.py         #   create_stage(mode, port) (creada, sin conectar) / create_real_stage() / create_mock_stage() / connect_real_stage()
 │       ├── sangaboard.py       #   SangaboardStageController
 │       ├── mock.py             #   MockStageController (simulación)
 │       └── _position_tracking.py  # Seguimiento compartido de posiciones
 ├── ui/                         # Capa de presentación PyQt5
-│   ├── startup.py              #   Inicio: selección de modo e idioma, conexión a la plataforma (Reintentar/Cambiar/Salir)
+│   ├── startup.py              #   Inicio: selección de modo e idioma (no toca el hardware)
 │   ├── language.py             #   Aplica y recuerda el idioma de la interfaz (integración Qt de core/i18n)
 │   ├── main_window.py          #   QMainWindow: integra paneles e hilos y gestiona el estado de la aplicación
-│   ├── stage_module.py         #   StageModule: controlador de la plataforma, hilo, panel, movimiento, enfoque y gestión de errores
-│   ├── panels/                 #   CameraPanel, CapturePanel, StagePanel, DisplayPanel (widgets QGroupBox)
-│   └── threads/                #   CameraThread, StageMovementThread, AutoFocusThread (QThread)
+│   ├── stage_module.py         #   StageModule: controlador de la plataforma, conexión en segundo plano, panel, movimiento, enfoque y gestión de "no detectada / perdida"
+│   ├── dialogs/                #   LogViewerDialog (registro de la sesión en vivo), AboutDialog (licencia)
+│   ├── panels/                 #   CameraPanel, CapturePanel, StagePanel, DisplayPanel (widgets QGroupBox), LogBar (controles del registro en la barra de estado)
+│   └── threads/                #   CameraThread, StageConnectThread, StageMovementThread, AutoFocusThread (QThread)
 ├── packaging/                  # Configuración de PyInstaller y scripts de compilación (véase BUILDING.md)
 ├── tools/i18n.py               # Herramientas de traducción (véase TRANSLATING.md)
 └── docs/                       # WIKI.md, BUILDING.md, TRANSLATING.md y README.es.md
@@ -79,7 +82,7 @@ pip install -r requirements/linux.txt
 
 ### Linux: permisos del puerto serie USB (grupo `dialout`)
 
-En Linux basado en Debian, los dispositivos serie USB (Sangaboard y Arduino) aparecen como `/dev/ttyACM*` o `/dev/ttyUSB*`. De forma predeterminada, solo `root` y los usuarios del grupo `dialout` pueden leerlos y escribir en ellos. Si la conexión con la plataforma falla por un error de permisos, añade tu usuario a ese grupo:
+En Linux basado en Debian, los dispositivos serie USB (Sangaboard) aparece como `/dev/ttyACM*` o `/dev/ttyUSB*`. De forma predeterminada, solo `root` y los usuarios del grupo `dialout` pueden leerlos y escribir en ellos. Si la conexión con la plataforma falla por un error de permisos, añade tu usuario a ese grupo:
 
 ```bash
 sudo usermod -aG dialout $USER
@@ -106,6 +109,8 @@ python app.py --mode simulation     # solo desde la línea de comandos; no apare
 python app.py --stage-port COM5     # fuerza el puerto serie de la plataforma
 python app.py --lang es_419         # idioma de la interfaz para esta ejecución (inglés o español)
 python app.py --log-level DEBUG
+python app.py --save-log            # además, guarda el registro de la sesión en un archivo (véase "Registro de la sesión")
+python app.py --save-log ~/lab/run1.log   # ...en un archivo a tu elección (o en una carpeta)
 python app.py --help                # modos, funciones y ejemplos
 ```
 
@@ -113,13 +118,9 @@ Al iniciar, puedes seleccionar un modo en la pantalla de inicio o saltarte esa s
 
 | Modo | Uso previsto | Controles de la plataforma | Comportamiento |
 |---|---|---|---|
-| **Automatizado** | Microscopio totalmente motorizado | Visibles, hardware real | Si no se puede conectar con la plataforma al iniciar, aparece un error con las opciones *Reintentar / Elegir otro modo / Salir*. Si deja de responder durante la ejecución, se muestra un error explícito y los controles de la plataforma se desactivan. |
-| **Manual** | Dispositivo sin motores | Ocultos | Solo selección de cámara, captura de fotografías y grabación. |
+| **Automatizado** | Microscopio totalmente motorizado | Visibles, hardware real.
+| **Manual** | Dispositivo sin motores | Solo selección de cámara, captura de fotografías y grabación. |
 | **Simulación** | Probar el software sin hardware | Visibles, plataforma simulada | Solo desde la línea de comandos (`--mode simulation` o `--simulate`); no aparece en la pantalla de inicio. No se mueve ningún componente físico y el título de la ventana termina en `SIMULATION`. |
-
-Para cambiar el modo o el idioma más adelante, haz clic en **Change mode / language...** en la parte superior de los controles. Volverás a la pantalla de inicio sin cerrar el programa. Si cancelas, la sesión actual seguirá ejecutándose. Esta opción también permite volver a conectarse después de un error de la plataforma.
-
-En cualquier modo, si no se puede abrir la cámara, el área de imagen mostrará **Camera not detected**. Selecciona otro dispositivo o backend en los menús desplegables y pulsa de nuevo **Start Stream**.
 
 ### Controles
 
@@ -135,7 +136,7 @@ En cualquier modo, si no se puede abrir la cámara, el área de imagen mostrará
 
 ## Configuración
 
-**Puerto de la plataforma:** el modo automatizado intenta primero utilizar el puerto predeterminado de la plataforma (`DEFAULT_STAGE_PORT_WINDOWS` / `DEFAULT_STAGE_PORT_LINUX` en `core/config.py`) y, después, busca entre los puertos serie disponibles. Puedes especificar uno mediante `--stage-port` o pasar `port=` a `connect_real_stage()` / `SangaboardStageController()` desde el código. La plataforma Arduino (`ArduinoStageController`) está implementada, pero no se ofrece en el diálogo de selección de modo. Para utilizarla, debes instanciarla en lugar de Sangaboard dentro de `connect_real_stage()` en `hardware/stage/__init__.py`.
+**Puerto de la plataforma:** el modo automatizado intenta primero utilizar el puerto predeterminado de la plataforma (`DEFAULT_STAGE_PORT_WINDOWS` / `DEFAULT_STAGE_PORT_LINUX` en `core/config.py`) y, después, busca entre los puertos serie disponibles. Puedes especificar uno mediante `--stage-port` o pasar `port=` a `create_stage()` / `create_real_stage()` / `SangaboardStageController()` desde el código.
 
 **Idioma de la interfaz:** se selecciona en el diálogo de inicio, donde la aplicación recuerda la elección entre ejecuciones, o mediante `--lang`. Para editar o añadir idiomas, consulta [TRANSLATING.md](../TRANSLATING.md).
 
@@ -148,7 +149,6 @@ En cualquier modo, si no se puede abrir la cámara, el área de imagen mostrará
 ## Requisitos de hardware
 
 - **Controlador Sangaboard** mediante USB (puerto predeterminado `COM5` en Windows y `/dev/ttyACM0` en Linux). Requiere el paquete `sangaboard`. En Linux, el usuario debe pertenecer al grupo `dialout` (véase la sección anterior).
-- **Plataforma Arduino** (alternativa disponible desde el código): puerto predeterminado `COM12`. Requiere `pyserial`. No se puede seleccionar desde el diálogo de modos; consulta [Configuración](#configuración). En Linux también requiere pertenecer al grupo `dialout`.
 - **Nombres de las cámaras** en el menú desplegable: en Windows se obtienen mediante el paquete `pygrabber`, instalado por `requirements/windows.txt`. En Linux se leen directamente del sistema, sin paquetes adicionales. Si no se dispone de los nombres, el menú mostrará entradas genéricas como `Camera 0`, `Camera 1`, etc.
 
 ---
@@ -157,9 +157,9 @@ En cualquier modo, si no se puede abrir la cámara, el área de imagen mostrará
 
 **La cámara no se inicia** —> Selecciona otro dispositivo de la lista (↻ actualiza la lista), cambia el backend de Media Foundation a DirectShow en Windows, comprueba que ninguna otra aplicación esté utilizando la cámara y verifica que los controladores estén instalados.
 
-**La plataforma no se conecta en Linux (error al iniciar)** —> Normalmente se debe a un problema de permisos o a que el usuario no pertenece al grupo `dialout`. Consulta [Linux: permisos del puerto serie USB](#linux-permisos-del-puerto-serie-usb-grupo-dialout). Comprueba también `/dev/tty*`, verifica que `sangaboard` esté instalado e intenta ejecutar `--stage-port /dev/ttyACM0`. El diálogo de error muestra los puertos serie que el sistema puede detectar.
+**"Stage not detected" en Linux** —> Normalmente se debe a un problema de permisos o a que el usuario no pertenece al grupo `dialout`. Consulta [Linux: permisos del puerto serie USB](#linux-permisos-del-puerto-serie-usb-grupo-dialout). Comprueba también `/dev/tty*`, verifica que `sangaboard` esté instalado e intenta ejecutar `--stage-port /dev/ttyACM0`. El registro contiene el mensaje completo, que muestra los puertos serie que el sistema puede detectar. Después de corregir la causa, pulsa **Retry connection** (no es necesario reiniciar el programa; un cambio de grupo requiere iniciar sesión de nuevo).
 
-**La plataforma no se conecta en Windows** —> Busca el puerto `COM*` de la placa en el Administrador de dispositivos y especifícalo mediante `--stage-port COM5`. Comprueba que `sangaboard` esté instalado y cierra cualquier otro programa que pueda estar utilizando el puerto.
+**"Stage not detected" en Windows** —> Busca el puerto `COM*` de la placa en el Administrador de dispositivos y especifícalo mediante `--stage-port COM5`. Comprueba que `sangaboard` esté instalado, cierra cualquier otro programa que pueda estar utilizando el puerto y pulsa **Retry connection**.
 
 **Aparece "Camera not detected" en el área de imagen** —> Selecciona otro dispositivo o backend y pulsa de nuevo **Start Stream**. Cierra otras aplicaciones que puedan estar utilizando la cámara.
 
@@ -176,8 +176,7 @@ Se utilizaron herramientas de IA como apoyo en la generación de código, depura
 
 ## Licencia
 
-Consulta el archivo [`LICENSE`](../../LICENSE). El software se proporciona tal cual, para uso educativo y de laboratorio.
-
+Publicado bajo la **Licencia Pública General de GNU, versión 3**: consulta el archivo [`LICENSE`](../../LICENSE).
 ## Colaboradores
 
 - Joaquín Acosta Aguilera, Caracara Tech

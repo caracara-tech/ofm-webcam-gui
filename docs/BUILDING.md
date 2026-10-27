@@ -23,10 +23,10 @@ it adds an application-menu entry.
 
 What the executables do differently from running from source:
 
-- They contain everything, including the compiled translation catalogs and
-  Qt's own Spanish texts.
-- They save captures to `~/Pictures/ofm-webcam-gui` and remember the interface
-  language per user.
+- They contain everything, including the compiled translation catalogs, Qt's
+  own Spanish texts and the `LICENSE` file (shown by **About / License**).
+- They save captures to `~/Pictures/ofm-webcam-gui`, session logs to
+  `~/ofm-webcam-gui/logs`, and remember the interface language per user.
 - Startup is slow-ish: a single-file build unpacks itself on every launch.
 
 ## Troubleshooting a build
@@ -40,6 +40,12 @@ What the executables do differently from running from source:
 - **A language is missing from the built app.** The build packs the compiled
   `.mo` files that are committed. Run `python tools/i18n.py compile` after
   editing a `.po` file (see [TRANSLATING.md](TRANSLATING.md)).
+- **The About dialog says the license file was not found.** The spec must bundle
+  `LICENSE` (it does: the `datas.append(...)` line for it); if you changed the
+  spec, keep that line.
+- **Nothing visible when a windowed build crashes.** Uncaught exceptions are
+  written to the session log: run with `--save-log` and read the file (or switch
+  on **Save log to file** in the window), or use `console=True` as above.
 
 ## The Debian package
 
@@ -47,6 +53,8 @@ What the executables do differently from running from source:
   tree stays clean. The package version is read from `core/version.py`.
 - It depends on `libgl1` and `libxkbcommon-x11-0`; the rest of Qt's X11
   libraries are bundled in the binary. Not yet verified on a clean machine.
+- The license is installed as `/usr/share/doc/ofm-webcam-gui/copyright`, where
+  Debian expects it (the binary also carries its own copy for the in-app dialog).
 - The menu entry names an icon (`Icon=ofm-webcam-gui`) but no icon file is
   shipped yet, so menus show a generic icon. To add one, put
   `ofm-webcam-gui.png` (or `.svg`) in `packaging/linux/debian/usr/share/pixmaps/`.
@@ -64,6 +72,9 @@ This adds an `ofm-webcam-gui` command, with its dependencies taken from
 
 ## Things that live in one place
 
+- **License:** the `LICENSE` file only. The PyInstaller spec bundles it, the
+  `.deb` build installs it as `copyright`, and `core/app_info.py::load_license_text()`
+  reads it (from the code folder, or from the package metadata for pip installs).
 - **Version:** `core/version.py` only. `pyproject.toml`, the window title, the
   `.deb` build and the translation tool all read it.
 - **Dependencies:** listed twice, in `requirements/*.txt` (used for running from

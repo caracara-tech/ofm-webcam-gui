@@ -55,7 +55,7 @@ _LABELS = {
 _DESCRIPTIONS = {
     AppMode.AUTOMATED: N_(
         "Full microscope: live camera and motorized stage control. "
-        "Requires the stage board to be connected."
+        "If the stage board is not found, its controls stay off until you retry."
     ),
     AppMode.MANUAL: N_(
         "Device without motors: camera preview, snapshots and recording. "

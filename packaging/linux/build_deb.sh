@@ -26,6 +26,8 @@ mkdir -p "$STAGE/usr/bin"
 cp "$BIN" "$STAGE/usr/bin/ofm-webcam-gui"
 chmod 755 "$STAGE/usr/bin/ofm-webcam-gui"
 sed -i "s/@VERSION@/$VERSION/" "$STAGE/DEBIAN/control"
+# Debian expects the license text at /usr/share/doc/<package>/copyright.
+install -Dm644 "$REPO_ROOT/LICENSE" "$STAGE/usr/share/doc/ofm-webcam-gui/copyright"
 
 OUT="$REPO_ROOT/dist/linux/ofm-webcam-gui_${VERSION}_amd64.deb"
 dpkg-deb --build --root-owner-group "$STAGE" "$OUT"

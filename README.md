@@ -5,7 +5,6 @@
 [![PyQt5](https://img.shields.io/badge/UI-PyQt5-7B1FA2?logo=qt&logoColor=white)](../../)
 [![OpenCV](https://img.shields.io/badge/vision-OpenCV-C62828?logo=opencv&logoColor=white)](../../)
 [![Sangaboard](https://img.shields.io/badge/stage-Sangaboard-E65100)](../../)
-[![Arduino](https://img.shields.io/badge/stage-Arduino-00838F?logo=arduino&logoColor=white)](../../)
 [![Microscopy](https://img.shields.io/badge/application-Microscopy-F9A825)](../../)
 [![License](https://img.shields.io/badge/license-GPL--3.0-5D4037)](LICENSE)
 
@@ -13,7 +12,7 @@
 
 A PyQt5 + OpenCV application for streaming webcam feeds and capturing
 snapshots/recordings, with optional precision XYZ stage control and
-coarse-to-fine autofocus for microscopy setups (Sangaboard or Arduino-based
+coarse-to-fine autofocus for microscopy setups (Sangaboard-based
 stages).
 
 > **More documentation:** the [developer wiki](docs/WIKI.md) explains the
@@ -28,7 +27,8 @@ stages).
 
 ```
 ofm-webcam-gui/
-├── app.py                      # Entry point: python app.py [--mode manual|automated|simulation] [--stage-port PORT] [--lang CODE] [--log-level DEBUG]
+├── app.py                      # Entry point: python app.py [--mode manual|automated|simulation] [--stage-port PORT] [--lang CODE] [--log-level DEBUG] [--save-log [PATH]]
+├── LICENSE                     # GNU General Public License v3 (also shown in the app: About / License)
 ├── pyproject.toml              # Package metadata + dependencies (optional: pip install .)
 ├── requirements/               # Dependency lists per platform (base / windows / linux; i18n for translators)
 ├── core/                       # Framework-agnostic types, config, and math (no Qt, no cv2 I/O)
@@ -36,6 +36,9 @@ ofm-webcam-gui/
 │   ├── version.py              #   The application version
 │   ├── platform_info.py        #   Platform detection + per-OS defaults (PlatformProfile)
 │   ├── app_mode.py             #   AppMode enum: manual / automated / simulation
+│   ├── app_info.py             #   App name, license facts, load_license_text()
+│   ├── device_status.py        #   DeviceState / DeviceStatus: how a device reports "connecting / connected / not detected / lost"
+│   ├── logging_setup.py        #   Session logging: in-memory history, optional log file, uncaught-exception hook
 │   ├── i18n.py                 #   Interface-language runtime
 │   ├── locales/                #   Translation catalogs
 │   ├── config.py               #   Resolutions, backend lists, default ports, default output folder
@@ -48,18 +51,18 @@ ofm-webcam-gui/
 │   ├── cameras.py              #   Lists connected cameras by name (Windows: pygrabber, Linux: sysfs)
 │   ├── errors.py               #   StageCommunicationError
 │   └── stage/
-│       ├── __init__.py         #   connect_real_stage() (raises on failure) / create_mock_stage()
-│       ├── arduino.py          #   ArduinoStageController
+│       ├── __init__.py         #   create_stage(mode, port) (built, not connected) / create_real_stage() / create_mock_stage() / connect_real_stage()
 │       ├── sangaboard.py       #   SangaboardStageController
 │       ├── mock.py             #   MockStageController (simulation)
 │       └── _position_tracking.py  # Shared position-bookkeeping mixin
 ├── ui/                         # PyQt5 presentation layer
-│   ├── startup.py              #   Launch flow: mode + language dialog, stage connection (Retry/Change/Quit)
+│   ├── startup.py              #   Launch flow: mode + language dialog (touches no hardware)
 │   ├── language.py             #   Applies and remembers the interface language (Qt side of core/i18n)
 │   ├── main_window.py          #   QMainWindow: composes panels + threads, owns app state
-│   ├── stage_module.py         #   StageModule: stage controller, thread, panel, jog/autofocus, failure handling
-│   ├── panels/                 #   CameraPanel, CapturePanel, StagePanel, DisplayPanel (QGroupBox widgets)
-│   └── threads/                #   CameraThread, StageMovementThread, AutoFocusThread (QThread)
+│   ├── stage_module.py         #   StageModule: stage controller, background connection, panel, jog/autofocus, "not detected / lost" handling
+│   ├── dialogs/                #   LogViewerDialog (live session log), AboutDialog (license)
+│   ├── panels/                 #   CameraPanel, CapturePanel, StagePanel, DisplayPanel (QGroupBox widgets), LogBar (status-bar log controls)
+│   └── threads/                #   CameraThread, StageConnectThread, StageMovementThread, AutoFocusThread (QThread)
 ├── packaging/                  # PyInstaller spec + build scripts (see docs/BUILDING.md)
 ├── tools/i18n.py               # Translation tooling (see docs/TRANSLATING.md)
 └── docs/                       # WIKI.md (developers), BUILDING.md, TRANSLATING.md
@@ -86,7 +89,7 @@ pip install -r requirements/linux.txt
 
 ### Linux: USB serial permissions (`dialout` group)
 
-On Debian-based Linux, USB serial devices (Sangaboard, Arduino) show up as
+On Debian-based Linux, USB serial devices (Sangaboard) shows up as
 `/dev/ttyACM*` or `/dev/ttyUSB*`, and by default only `root` and members
 of the `dialout` group can read/write them. If the stage fails to connect
 with a permissions error, add your user to that group:
@@ -120,6 +123,8 @@ python app.py --mode simulation     # command line only, not in the dialog
 python app.py --stage-port COM5     # force the stage's serial port
 python app.py --lang es_419         # interface language for this run (English, Spanish)
 python app.py --log-level DEBUG
+python app.py --save-log            # also write the session log to a file (see "Session log" below)
+python app.py --save-log ~/lab/run1.log   # ...to a file of your choice (or a folder)
 python app.py --help                # modes, features and examples
 ```
 
@@ -127,18 +132,9 @@ On launch you choose a mode in the start screen (or skip it with `--mode`):
 
 | Mode | For | Stage controls | Behaviour |
 |---|---|---|---|
-| **Automated** | Full motorized microscope | Shown, real hardware | If the stage can't be reached at startup you get an error with *Retry / Choose another mode / Quit*. If it stops responding while running, an explicit error is shown and the stage controls are disabled. |
-| **Manual** | Device without motors | Hidden | Camera selection, snapshots and recording only. |
+| **Automated** | Full motorized microscope | Shown, real hardware.
+| **Manual** | Device without motors | Camera selection, snapshots and recording only. |
 | **Simulation** | Trying the software without hardware | Shown, simulated stage | Command line only (`--mode simulation` or `--simulate`); not listed in the start screen. Nothing physical moves; the window title ends in `SIMULATION`. |
-
-To switch mode or language later, click **Change mode / language...** at the
-top of the controls: it returns to the start screen without closing the
-program. Cancel keeps the current session running. It is also the way to
-reconnect after a stage error.
-
-In every mode, if the camera can't be opened the image box says
-**Camera not detected**; pick another device or backend from the dropdowns and
-press Start Stream again.
 
 ### Controls
 
@@ -171,10 +167,7 @@ press Start Stream again.
 Stage port: Automated mode tries the platform default port first
 (`DEFAULT_STAGE_PORT_WINDOWS` / `DEFAULT_STAGE_PORT_LINUX` in `core/config.py`),
 then scans all serial ports. Force one with `--stage-port`, or pass `port=` to
-`connect_real_stage()` / `SangaboardStageController()` in code. The Arduino
-stage (`ArduinoStageController`) is implemented but not offered by the mode
-dialog; to use it, construct it in place of the Sangaboard in
-`connect_real_stage()` in `hardware/stage/__init__.py`.
+`create_stage()` / `create_real_stage()` / `SangaboardStageController()` in code.
 
 Interface language: chosen in the startup dialog (remembered between runs) or
 with `--lang`. To edit or add a language, see [docs/TRANSLATING.md](docs/TRANSLATING.md).
@@ -199,9 +192,6 @@ framing and relative comparisons.
 - **Sangaboard** controller via USB (default `COM5` on Windows, `/dev/ttyACM0`
   on Linux). Requires the `sangaboard` package. On Linux, requires the user
   to be in the `dialout` group (see above).
-- **Arduino stage** (alternative, code only): default port `COM12`. Requires
-  `pyserial`. Not selectable from the mode dialog; see
-  [Configuration](#configuration). Same `dialout` group requirement on Linux.
 - **Camera names** in the device dropdown: on Windows they come from the
   `pygrabber` package (installed by `requirements/windows.txt`); on Linux they
   are read from the system, no extra package. Without names, the dropdown
@@ -215,16 +205,19 @@ framing and relative comparisons.
 it); switch backend from Media Foundation to DirectShow (Windows); check no
 other app is using the camera; confirm drivers are installed.
 
-**Stage not connecting on Linux (error at startup)** —>
+**"Stage not detected" on Linux** —>
 almost always a `dialout` group / permissions issue; see
 [Linux: USB serial permissions](#linux-usb-serial-permissions-dialout-group)
 above. Also check `/dev/tty*` for the device, confirm `sangaboard` is
-installed, and try `--stage-port /dev/ttyACM0`. The error dialog lists the
-serial ports the computer can see.
+installed, and try `--stage-port /dev/ttyACM0`. The log has the full
+message, which lists the serial ports the computer can see. After fixing the cause, press
+**Retry connection** (restarting the program is not needed; a group change
+needs a new login first).
 
-**Stage not connecting (Windows)** —> find the board's `COM*` port in Device
+**"Stage not detected" on Windows** —> find the board's `COM*` port in Device
 Manager and pass it with `--stage-port COM5`; confirm `sangaboard` is
-installed; close any other program that may hold the port.
+installed; close any other program that may hold the port; then press
+**Retry connection**.
 
 **"Camera not detected" in the image box** —> pick another device or backend
 and press Start Stream again; close other apps that use the camera.
@@ -253,7 +246,8 @@ AI tools were used to assist with code generation, debugging, refactoring, and d
 
 ## License
 
-See `LICENSE`. Provided as-is for laboratory and educational use.
+Released under the **GNU General Public License, version 3**: see
+[`LICENSE`](LICENSE).
 
 ## Contributors
 

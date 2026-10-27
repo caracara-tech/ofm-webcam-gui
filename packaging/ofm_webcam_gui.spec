@@ -23,6 +23,10 @@ if IS_WIN:
 for mo in (REPO_ROOT / "core" / "locales").glob("*/LC_MESSAGES/*.mo"):
     datas.append((str(mo), str(mo.parent.relative_to(REPO_ROOT))))
 
+# The license text, shown by the in-app "About / License" dialog (core/app_info.py
+# looks for LICENSE at the root of the bundle).
+datas.append((str(REPO_ROOT / "LICENSE"), "."))
+
 a = Analysis(
     [str(REPO_ROOT / "app.py")],
     pathex=[str(REPO_ROOT)],

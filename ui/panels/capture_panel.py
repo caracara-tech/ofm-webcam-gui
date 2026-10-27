@@ -20,7 +20,7 @@ class CapturePanel(QGroupBox):
     recording_toggled = pyqtSignal()
 
     def __init__(self, output_dir: Path, parent=None):
-        super().__init__(_("Snapshots & Recording"), parent)
+        super().__init__(_("Snapshots & Recording").replace("&", "&&"), parent)  # "&&": a literal & in a title, not a mnemonic
         layout = QGridLayout(self)
 
         layout.addWidget(QLabel(_("Output folder:")), 0, 0, 1, 3)

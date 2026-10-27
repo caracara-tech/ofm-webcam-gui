@@ -77,7 +77,7 @@ care:
 
 | English | Spanish |
 |---|---|
-| stage (microscope) | platina |
+| stage (microscope) | plataforma |
 | stage board / board | placa |
 | stream | transmisión |
 | snapshot | captura |

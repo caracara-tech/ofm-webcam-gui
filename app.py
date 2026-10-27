@@ -7,6 +7,7 @@ Run from the repository root (the directory containing this file):
     python app.py --mode manual         # skip the dialog: camera only (no motors)
     python app.py --mode simulation     # simulated stage (command line only)
     python app.py --lang es_419         # interface language for this run
+    python app.py --save-log            # also write the session log to a file
     python app.py --help                # what this software can do
 """
 
@@ -14,13 +15,19 @@ from __future__ import annotations
 
 import argparse
 import logging
+import os
 import sys
 from pathlib import Path
 from typing import Optional
 
 from core.app_mode import AppMode
-from core.config import DEFAULT_OUTPUT_DIR
+from core.config import DEFAULT_LOG_DIR, DEFAULT_OUTPUT_DIR
 from core.i18n import available_languages, match_language, resolve_language
+from core.logging_setup import LogSession, configure_logging, describe_environment, install_excepthook
+from core.platform_info import describe_platform
+from core.version import __version__
+
+logger = logging.getLogger("app")
 
 # How the user started us: "python app.py" from a source checkout, otherwise the
 # command's own name (a PyInstaller executable, or the pip-installed `ofm-webcam-gui`).
@@ -72,7 +79,17 @@ FEATURES
   Language      The interface language is chosen in the startup dialog and
                 remembered for next time, or forced for one run with --lang.
                 Installed: {_languages()}. Only the interface is translated;
-                this help text and the log output stay in English.
+                this help text and the framing of the log lines stay in
+                English (a message that is also shown in the window is
+                logged as shown).
+  Log           Everything the program logs is kept for the session and can
+                be read in the window ("View log..." in the status bar). Save
+                it with --save-log or the "Save log to file" box: the file
+                is created with the whole session so far, and unticking the
+                box deletes it again (recording continues). Default folder:
+                {DEFAULT_LOG_DIR}
+  License       GNU General Public License v3; "About / License" at the
+                bottom right of the window shows the full text.
   Stage         (automated and simulation modes) U/D/L/R for XY and
                 W/S for Z focus, with step size (um), speed (um/s) and a
                 live position readout. Autofocus runs a coarse-to-fine Z
@@ -86,6 +103,9 @@ EXAMPLES
       device without motors, no dialog
   {RUN_CMD} --mode automated --stage-port COM5
   {RUN_CMD} --mode simulation --log-level DEBUG
+  {RUN_CMD} --save-log
+      write the session log to {DEFAULT_LOG_DIR}
+  {RUN_CMD} --save-log ~/lab/run1.log --log-level DEBUG
   {RUN_CMD} --lang es_419
 """
 
@@ -164,7 +184,13 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
     parser.add_argument(
         "--log-level", default="INFO",
         choices=["DEBUG", "INFO", "WARNING", "ERROR"],
-        help="Logging verbosity (default: INFO)",
+        help="Logging verbosity, for the console, the in-window log and the log file (default: INFO)",
+    )
+    parser.add_argument(
+        "--save-log", nargs="?", const="", default=None, metavar="PATH",
+        help="Also write the session log to a file. PATH is a file, or a folder to put a "
+             "timestamped file in; without PATH the default log folder is used. "
+             "Can also be switched on later with the \"Save log to file\" box in the window.",
     )
     args = parser.parse_args(argv)
     if args.lang and match_language(args.lang) is None:
@@ -182,6 +208,24 @@ def main() -> None:
     # window, a camera or even importing the GUI stack.
     args = parse_args(sys.argv[1:])
 
+    # Logging next, so anything that goes wrong while importing or starting up
+    # is already recorded (and can be saved with --save-log).
+    save_path = os.path.expanduser(args.save_log) if args.save_log else None  # raw text: keeps a trailing "/"
+    log_session = configure_logging(
+        args.log_level, DEFAULT_LOG_DIR, save=args.save_log is not None, path=save_path,
+    )
+    install_excepthook()
+    logger.info("OFM Webcam Viewer v%s | %s | %s", __version__, describe_platform(), describe_environment())
+    logger.info("Arguments: %s", " ".join(sys.argv[1:]) or "(none)")
+
+    try:
+        exit_code = _run(args, log_session)
+    finally:
+        log_session.close()
+    sys.exit(exit_code)
+
+
+def _run(args: argparse.Namespace, log_session: LogSession) -> int:
     import cv2
 
     # Quiet OpenCV's internal backend-probing log spam before any cv2.VideoCapture use.
@@ -190,41 +234,46 @@ def main() -> None:
     except Exception:
         pass
 
+    from PyQt5.QtCore import PYQT_VERSION_STR, QT_VERSION_STR
     from PyQt5.QtWidgets import QApplication
 
     from ui.language import apply_language, saved_language, system_locale
 
-    logging.basicConfig(level=getattr(logging, args.log_level), format="%(levelname)s %(name)s: %(message)s")
+    logger.info("OpenCV %s | Qt %s | PyQt %s", cv2.__version__, QT_VERSION_STR, PYQT_VERSION_STR)
 
     requested = AppMode(args.mode) if args.mode else (AppMode.SIMULATION if args.simulate else None)
 
     app = QApplication(sys.argv)
     # Priority: --lang, then the remembered choice, then the OS language, then English.
-    apply_language(resolve_language(args.lang, saved_language(), system_locale()))
-    sys.exit(run_sessions(app, requested, args.stage_port))
+    language = apply_language(resolve_language(args.lang, saved_language(), system_locale()))
+    logger.info("Interface language: %s", language)
+    return run_sessions(app, requested, args.stage_port, log_session)
 
 
-def run_sessions(app, requested: Optional[AppMode], stage_port: Optional[str]) -> int:
+def run_sessions(app, requested: Optional[AppMode], stage_port: Optional[str], log_session: LogSession) -> int:
     """Run one window per session until the user quits; returns the exit code.
 
     `requested` (the command-line mode, if any) only applies to the first
     session. After "Change mode / language..." the window reports the mode
     picked on the start screen (`next_mode`) and we start it, without the
-    program ever closing.
+    program ever closing. The log session outlives the windows, so the log
+    (and the log file, if on) covers every session of the run.
     """
     from ui.main_window import MainWindow
-    from ui.startup import resolve_session
+    from ui.startup import choose_mode
 
     exit_code = 0
     while True:
-        session = resolve_session(requested, stage_port)
-        if session is None:
-            return exit_code  # the user closed the dialog or chose Quit
-        window = MainWindow(session.mode, session.stage)
+        mode = choose_mode(requested)
+        if mode is None:
+            logger.info("No mode chosen; exiting")
+            return exit_code  # the user closed the dialog
+        window = MainWindow(mode, log_session, stage_port=stage_port)
         window.show()
         exit_code = app.exec_()
         requested = window.next_mode
         if requested is None:
+            logger.info("Window closed; exiting with code %s", exit_code)
             return exit_code
 
 

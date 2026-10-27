@@ -4,9 +4,10 @@ from __future__ import annotations
 
 from PyQt5.QtCore import pyqtSignal
 from PyQt5.QtWidgets import (
-    QCheckBox, QGridLayout, QGroupBox, QHBoxLayout, QLabel, QPushButton, QSpinBox,
+    QCheckBox, QGridLayout, QGroupBox, QHBoxLayout, QLabel, QPushButton, QSpinBox, QVBoxLayout, QWidget,
 )
 
+from core.device_status import DeviceStatus
 from core.i18n import _, pgettext
 from core.types import Direction, Position, StageMotionSettings
 
@@ -48,16 +49,36 @@ def direction_label(direction: Direction) -> str:
 
 class StagePanel(QGroupBox):
     """Emits `jog_requested(Direction)` on button press and
-    `settings_changed(StageMotionSettings)` whenever the user edits a spinbox."""
+    `settings_changed(StageMotionSettings)` whenever the user edits a spinbox.
+
+    `show_status()` enables the controls only while the stage is connected and
+    shows a Retry button when it is not detected or was lost.
+    """
 
     jog_requested = pyqtSignal(object)  # Direction
     settings_changed = pyqtSignal(object)  # StageMotionSettings
     autofocus_requested = pyqtSignal()
+    retry_requested = pyqtSignal()
 
     def __init__(self, initial_settings: StageMotionSettings, parent=None):
         super().__init__(_("Stage Control"), parent)
         self.settings = initial_settings
-        layout = QGridLayout(self)
+        outer = QVBoxLayout(self)
+
+        # Only shown while the stage is not usable. The reason itself goes to the
+        # status bar and the log, like every other error; no text area here.
+        self.retry_btn = QPushButton(_("Retry connection"))
+        self.retry_btn.setToolTip(_("Try to connect to the stage again"))
+        self.retry_btn.clicked.connect(self.retry_requested.emit)
+        outer.addWidget(self.retry_btn)
+        self.retry_btn.hide()
+
+        # Everything else lives in one container so it can be enabled or
+        # disabled as a unit without touching the status area.
+        self._controls = QWidget()
+        outer.addWidget(self._controls)
+        layout = QGridLayout(self._controls)
+        layout.setContentsMargins(0, 0, 0, 0)
 
         self._direction_buttons: list[QPushButton] = []
         for direction, row, col in _DIRECTION_LAYOUT:
@@ -124,12 +145,16 @@ class StagePanel(QGroupBox):
         self.pos_y_label.setText(f"Y: {position_um.y:.2f}")
         self.pos_z_label.setText(f"Z: {position_um.z:.2f}")
 
+    def show_status(self, status: DeviceStatus) -> None:
+        """Enable the controls only while the stage is connected, and offer
+        "Retry connection" when it is not detected or was lost."""
+        self.retry_btn.setVisible(status.can_retry)
+        # What to check is the button's tooltip; the reason is in the status bar and the log.
+        self.retry_btn.setToolTip(status.description or _("Try to connect to the stage again"))
+        self.set_enabled_all(status.is_ok)
+
     def set_enabled_all(self, enabled: bool) -> None:
-        for i in range(self.layout().count()):
-            item = self.layout().itemAt(i)
-            widget = item.widget() if item else None
-            if widget is not None:
-                widget.setEnabled(enabled)
+        self._controls.setEnabled(enabled)
 
     def set_jog_enabled(self, enabled: bool) -> None:
         """Enable/disable just the direction and autofocus buttons - used to

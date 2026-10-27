@@ -1,32 +1,20 @@
-"""Launch-time flow: pick an operating mode and, for Automated mode, connect the stage.
+"""Launch-time flow: pick an operating mode (and the interface language).
 
-Runs before MainWindow exists, so a stage that cannot be reached is
-reported explicitly (retry / pick another mode / quit) instead of the app
-quietly opening in a different mode.
+Nothing here touches hardware. Every mode opens its window right away and each
+device reports for itself whether it was found (see ui/stage_module.py), so a
+missing stage behaves the same on every OS instead of being decided by a
+dialog before the window exists.
 """
 
 from __future__ import annotations
 
-from dataclasses import dataclass
 from typing import Optional
 
-from PyQt5.QtCore import Qt
-from PyQt5.QtWidgets import (
-    QApplication, QComboBox, QDialog, QHBoxLayout, QLabel, QMessageBox, QPushButton, QVBoxLayout,
-)
+from PyQt5.QtWidgets import QComboBox, QDialog, QHBoxLayout, QLabel, QPushButton, QVBoxLayout
 
 from core.app_mode import AppMode
 from core.i18n import _, available_languages, current_language
-from hardware.abstract import StageController
-from hardware.errors import StageCommunicationError
-from hardware.stage import connect_real_stage, create_mock_stage
 from .language import apply_language, save_language
-
-
-@dataclass
-class Session:
-    mode: AppMode
-    stage: Optional[StageController]  # None only in manual mode
 
 
 class ModeDialog(QDialog):
@@ -97,57 +85,8 @@ class ModeDialog(QDialog):
         return dialog.selected
 
 
-def _ask_after_stage_failure(message: str) -> str:
-    """Returns 'retry', 'change' or 'quit'."""
-    box = QMessageBox(QMessageBox.Critical, _("Stage not available"), message)
-    box.setInformativeText(_("Automated mode needs the stage board. What would you like to do?"))
-    retry = box.addButton(_("Retry"), QMessageBox.AcceptRole)
-    change = box.addButton(_("Choose another mode"), QMessageBox.ActionRole)
-    quit_btn = box.addButton(_("Quit"), QMessageBox.RejectRole)
-    box.setDefaultButton(retry)
-    box.exec_()
-    clicked = box.clickedButton()
-    if clicked is retry:
-        return "retry"
-    if clicked is change:
-        return "change"
-    return "quit" if clicked is quit_btn else "quit"
-
-
-def resolve_session(requested: Optional[AppMode], stage_port: Optional[str] = None) -> Optional[Session]:
-    """Pick the mode (dialog unless `requested` is given) and build the stage for it.
-
-    Returns None if the user cancelled or quit. Needs a QApplication.
-    """
-    mode = requested
-    while True:
-        if mode is None:
-            mode = ModeDialog.ask()
-            if mode is None:
-                return None
-
-        if mode is AppMode.SIMULATION:
-            return Session(mode, create_mock_stage())
-        if mode is AppMode.MANUAL:
-            return Session(mode, None)
-
-        QApplication.setOverrideCursor(Qt.WaitCursor)
-        error: Optional[StageCommunicationError] = None
-        stage = None
-        try:
-            stage = connect_real_stage(port=stage_port)
-        except StageCommunicationError as exc:
-            error = exc
-        finally:
-            QApplication.restoreOverrideCursor()
-
-        if error is None:
-            return Session(mode, stage)
-
-        action = _ask_after_stage_failure(str(error))
-        if action == "retry":
-            continue
-        if action == "change":
-            mode = None
-            continue
-        return None
+def choose_mode(requested: Optional[AppMode]) -> Optional[AppMode]:
+    """The mode to start: `requested` (from the command line) if given, else
+    whatever the user picks in the start dialog. None if they closed the dialog.
+    Needs a QApplication when it has to show the dialog."""
+    return requested if requested is not None else ModeDialog.ask()

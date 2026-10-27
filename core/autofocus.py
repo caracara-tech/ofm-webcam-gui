@@ -24,7 +24,7 @@ class AutoFocusSettings:
     Range/step are specified in *physical* units (micrometres) rather than
     raw motor steps, because a fixed step count means wildly different
     physical distances on different stages/calibrations (e.g. Sangaboard's
-    12.2 nm/step vs Arduino's 305.5 nm/step). Physical units are converted
+    12.2 nm/step vs a lead-screw stage's several hundred nm/step). Physical units are converted
     to steps per-stage via `AxisCalibration` right before a sweep runs -
     see `plan_autofocus_sweep` below.
 

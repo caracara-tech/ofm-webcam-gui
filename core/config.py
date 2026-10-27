@@ -24,19 +24,31 @@ from .types import CameraBackend, Resolution
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 
 
+def _from_source_checkout() -> bool:
+    """True when running the code straight from the repository.
+
+    Anywhere else (a PyInstaller executable, whose files live in a temp dir that
+    is deleted on exit, or a pip-installed copy under site-packages, which is not
+    meant to be written to) user files go under the home folder instead.
+    """
+    return not getattr(sys, "frozen", False) and (PROJECT_ROOT / "pyproject.toml").is_file()
+
+
 def _default_output_dir() -> Path:
     """Where snapshots/recordings go unless the user picks another folder.
 
-    Running from a source checkout: <repo>/gallery (next to the code). Anywhere
-    else (a PyInstaller executable, whose files live in a temp dir that is
-    deleted on exit, or a pip-installed copy under site-packages, which is not
-    meant to be written to): the user's Pictures folder.
+    Source checkout: <repo>/gallery. Anywhere else: the user's Pictures folder.
     """
-    from_source_checkout = not getattr(sys, "frozen", False) and (PROJECT_ROOT / "pyproject.toml").is_file()
-    return PROJECT_ROOT / "gallery" if from_source_checkout else Path.home() / "Pictures" / "ofm-webcam-gui"
+    return PROJECT_ROOT / "gallery" if _from_source_checkout() else Path.home() / "Pictures" / "ofm-webcam-gui"
+
+
+def _default_log_dir() -> Path:
+    """Where session log files go: <repo>/logs from a checkout, else ~/ofm-webcam-gui/logs."""
+    return PROJECT_ROOT / "logs" if _from_source_checkout() else Path.home() / "ofm-webcam-gui" / "logs"
 
 
 DEFAULT_OUTPUT_DIR = _default_output_dir()
+DEFAULT_LOG_DIR = _default_log_dir()
 
 RESOLUTIONS: list[Resolution] = [
     Resolution("1280 x 720", 1280, 720),
@@ -85,6 +97,3 @@ def default_backend_position() -> int:
 def default_stage_port() -> str:
     return current_profile().default_stage_port
 
-
-def default_arduino_port() -> str:
-    return current_profile().default_arduino_port
