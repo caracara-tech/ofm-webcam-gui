@@ -1,0 +1,4 @@
+#!/bin/sh
+# Entry point of the AppImage: start the bundled PyInstaller program.
+HERE="$(dirname "$(readlink -f "$0")")"
+exec "$HERE/usr/lib/ofm-webcam-gui/ofm-webcam-gui" "$@"

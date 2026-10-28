@@ -5,7 +5,7 @@ Nothing else in the codebase should call `platform.system()` directly —
 import `CURRENT_PLATFORM` / `PlatformProfile` from here instead. This keeps
 platform-specific decisions (default ports, default camera backend, which
 optional features are available) in one auditable place, which matters once
-we're shipping separate Windows and Linux executables built from the same
+we're shipping separate Windows, Linux and macOS builds built from the same
 source.
 """
 
@@ -47,8 +47,8 @@ def describe_platform() -> str:
 
 @dataclass(frozen=True)
 class PlatformProfile:
-    """Everything that differs between the Windows build and the Linux
-    (Debian-based) build lives in one of these."""
+    """Everything that differs between the Windows, Linux and macOS
+    builds lives in one of these."""
 
     platform: Platform
     default_backend: Optional[int]      # cv2.CAP_* constant preselected in the UI (None: first listed)

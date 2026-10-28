@@ -1,0 +1,7 @@
+-r base.txt
+
+# Sangaboard stage controller
+sangaboard>=0.1.0
+
+# NOTE: pygrabber is Windows-only and is not listed here. Camera names are not
+# listed on macOS yet (hardware/cameras.py falls back to generic entries).

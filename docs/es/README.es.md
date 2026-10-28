@@ -12,7 +12,7 @@
 
 Aplicación desarrollada con PyQt5 y OpenCV para visualizar imágenes de cámaras web y capturar fotografías y grabaciones, con control opcional de una plataforma de precisión XYZ y enfoque automático de búsqueda gruesa a fina para sistemas de microscopía (basadas en Sangaboard).
 
-> **Más documentación:** la [wiki para desarrolladores](../WIKI.md) explica la arquitectura y las funciones principales; [BUILDING.md](../BUILDING.md) describe cómo generar ejecutables, paquetes `.deb` e instalar mediante pip; [TRANSLATING.md](../TRANSLATING.md) explica cómo gestionar los idiomas de la interfaz.
+> **Más documentación:** la [wiki para desarrolladores](../WIKI.md) explica la arquitectura y las funciones principales; [BUILDING.md](../BUILDING.md) describe cómo generar ejecutables, AppImage de Linux, `.dmg` de macOS e instalar mediante pip; [TRANSLATING.md](../TRANSLATING.md) explica cómo gestionar los idiomas de la interfaz.
 >
 > Este README se centra en cómo ejecutar la aplicación.
 
@@ -78,6 +78,8 @@ pip install -r requirements/windows.txt
 
 # Linux:
 pip install -r requirements/linux.txt
+# macOS:
+pip install -r requirements/macos.txt
 ```
 
 ### Linux: permisos del puerto serie USB (grupo `dialout`)

@@ -17,7 +17,7 @@ stages).
 
 > **More documentation:** the [developer wiki](docs/WIKI.md) explains the
 > architecture and every key function; [docs/BUILDING.md](docs/BUILDING.md)
-> covers executables, the `.deb` and pip packaging;
+> covers the Windows `.exe`, Linux AppImage, macOS `.dmg` and pip packaging;
 > [docs/TRANSLATING.md](docs/TRANSLATING.md) covers interface languages.
 > This README covers running the app.
 
@@ -85,6 +85,8 @@ source venv/bin/activate   # Windows: venv\Scripts\activate
 pip install -r requirements/windows.txt
 # Linux:
 pip install -r requirements/linux.txt
+# macOS:
+pip install -r requirements/macos.txt
 ```
 
 ### Linux: USB serial permissions (`dialout` group)

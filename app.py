@@ -38,7 +38,7 @@ OFM Webcam Viewer: a desktop GUI for OpenFlexure-style microscopes.
 
 Live camera preview with snapshots and video recording, plus optional
 motorized stage control (XY jog, Z focus, autofocus) through a Sangaboard.
-Runs the same way on Windows and Linux."""
+Runs the same way on Windows, Linux and macOS."""
 
 
 def _languages() -> str:
