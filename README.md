@@ -75,7 +75,13 @@ matters and how to navigate it.
 
 ---
 
-## Installation (running from source)
+## Installation 
+
+### Prebuilt Executables
+
+Prebuilt executables are available for **Windows** and **Linux** on the [GitHub Releases](https://github.com/caracara-tech/ofm-webcam-gui/releases) page.
+
+### Running from source
 
 ```bash
 python -m venv venv

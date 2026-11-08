@@ -67,7 +67,13 @@ ofm-webcam-gui/
 
 ---
 
-## Instalación (ejecución desde el código fuente)
+## Instalación
+
+### Ejecutables precompilados
+
+Hay ejecutables precompilados disponibles para **Windows** y **Linux** en la página de [GitHub Releases](https://github.com/caracara-tech/ofm-webcam-gui/releases).
+
+### Ejecutar desde el código fuente
 
 ```bash
 python -m venv venv
