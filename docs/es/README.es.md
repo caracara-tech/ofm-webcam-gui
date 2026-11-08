@@ -120,8 +120,8 @@ Al iniciar, puedes seleccionar un modo en la pantalla de inicio o saltarte esa s
 
 | Modo | Uso previsto | Controles de la plataforma | Comportamiento |
 |---|---|---|---|
-| **Automatizado** | Microscopio totalmente motorizado | Visibles, hardware real.
-| **Manual** | Dispositivo sin motores | Solo selección de cámara, captura de fotografías y grabación. |
+| **Automatizado** | Microscopio totalmente motorizado | Visibles, hardware real. | Si no se puede acceder a la plataforma al iniciar, aparece un error con las opciones *Reintentar / Elegir otro modo / Salir*. Si deja de responder mientras está en ejecución, se muestra un error explícito y los controles de la plataforma quedan deshabilitados. |
+| **Manual** | Dispositivo sin motores | Oculto | Solo selección de cámara, captura de fotografías y grabación. |
 | **Simulación** | Probar el software sin hardware | Visibles, plataforma simulada | Solo desde la línea de comandos (`--mode simulation` o `--simulate`); no aparece en la pantalla de inicio. No se mueve ningún componente físico y el título de la ventana termina en `SIMULATION`. |
 
 ### Controles
