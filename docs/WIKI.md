@@ -98,12 +98,12 @@ faster for building a mental model than reading files in isolation:
 - **"What happens when the stage board isn't plugged in?"** →
   `app.py::run_sessions` (opens the window; nothing hardware-related happens first) →
   `ui/main_window.py::MainWindow.__init__` (`create_stage()` builds an unconnected
-  controller, `StageModule.start()` is called last) →
+  controller; the "Connect to stage" button → `StageModule.connect_stage()`) →
   `ui/threads/stage_connect_thread.py::StageConnectThread.run` (background
   `connect()`) → `hardware/stage/sangaboard.py::connect` (raises
   `StageCommunicationError` with the explanation) →
   `ui/stage_module.py::_on_connect_failed` → `_set_status()` →
-  `ui/panels/stage_panel.py::show_status` (controls off, Retry button) plus the
+  `ui/panels/stage_panel.py::show_status` (controls off, button reads Retry) plus the
   status-bar line and the log entry.
 - **"What happens when I click Autofocus?"** →
   `ui/stage_module.py::StageModule._run_autofocus` →
@@ -322,9 +322,9 @@ in real-world distance on every different piece of hardware.
 
 ### `core/device_status.py` - how a device reports itself
 
-- **`DeviceState`** —> `CONNECTING` / `CONNECTED` / `NOT_DETECTED` / `LOST`.
+- **`DeviceState`** —> `DISCONNECTED` / `CONNECTING` / `CONNECTED` / `NOT_DETECTED` / `LOST`.
 - **`DeviceStatus(state, headline, description, detail)`** —> `is_ok`,
-  `can_retry`, `text()` (what a panel shows) and `one_line()` (status bar).
+  `can_retry`, `can_connect`, `text()` (what a panel shows) and `one_line()` (status bar).
 
 ### `core/app_info.py` - the app's own facts
 
@@ -473,7 +473,9 @@ default is honest about what it can and can't know.
   the mode, touches no hardware.
 - **`StageModule`** —> owns the stage controller, `StageConnectThread`,
   `StageMovementThread`, position timer, `StagePanel`, and the jog/autofocus
-  handlers. `start()` begins connecting; `retry_connection()` reconnects;
+  handlers. `start()` announces "not connected" (and connects at once only when
+  `auto_connect` is set, which `MainWindow` does for the simulated stage);
+  `connect_stage()` (the panel button) connects or retries;
   `_set_status()` is the single place connection state changes;
   `_handle_stage_failure()` turns a mid-run failure into `LOST`. Not created in
   manual mode.
@@ -561,12 +563,13 @@ backends, instead of each reimplementing the same bookkeeping.
   `burn_timestamp`, `set_recording()`, `set_output_dir_text()`. Opening the
   folder goes through `ui/desktop.py::open_in_file_manager()`.
 - **`StagePanel`** —> jog buttons, step/speed settings, live position
-  readout, Autofocus button, plus a **Retry connection** button shown only while
-  the stage is not detected or was lost (no text area: the reason goes to the
-  status bar and the log); exposes
+  readout, Autofocus button, plus one connect button shown while the stage is not
+  connected: **Connect to stage** (not tried yet), **Connecting...** (disabled),
+  **Retry connection** (not detected or lost); no text area: the reason goes to
+  the status bar and the log; exposes
   `show_status(DeviceStatus)`, `update_position_display()`, `set_jog_enabled()`
   (blocks new moves while one is in flight), `set_enabled_all()`; emits
-  `retry_requested`. The tooltip of the Retry button says what to check.
+  `connect_requested`. The tooltip of the button says what to do or check.
 - **`LogBar`** —> **Save log to file** checkbox and **View log...** button, small
   enough for the status bar (the controls column is already screen-tall); emits
   `save_toggled`, `view_requested`; `set_saving()` reflects the real state without
@@ -602,15 +605,21 @@ contain camera/stage/autofocus *logic* itself. Notable methods:
 - **`_on_save_log_toggled()` / `_show_log_viewer()` / `_open_log_folder()` /
   `_show_about()`** -> react to `LogBar` and the About button. The status-bar
   buttons are deliberately normal (not flat) buttons so they read as clickable,
-  unlike the status message beside them. `_grow_to_fit()` re-fits the window when
-  the Display panel's **Advanced** section expands (`adjustSize()` is capped at
-  two thirds of the screen and a layout's minimum height ignores wrapped text).
-- **`_start_stream()` / `_stop_stream()`** -> start/stop `CameraThread`.
+  unlike the status message beside them. The controls column is a `ScrollColumn`,
+  so expanding the Display panel's **Advanced** section scrolls instead of
+  resizing the window.
+- **`_start_stream()` / `_stop_stream()`** -> start/stop `CameraThread`. The
+  capture resolution never resizes the preview or the window.
+- **Layout contract** -> `VideoView` (`ui/widgets/video_view.py`) takes all spare
+  space with constant size hints and paints picture/messages/flash itself;
+  `ScrollColumn` (`ui/widgets/scroll_column.py`) gives the controls their
+  natural width and scrolls vertically. Content must never set a fixed size on
+  either; `ui/scaling.py` enables high-DPI scaling so this holds across screens.
 - **`_on_frame(frame, fps)`** -> receives frames from `CameraThread`. Calls
   `_draw_overlays()` for whatever should be baked into the saved video
   (scale bar, timestamp) *before* writing to `VideoWriter`, then applies`
   preview-only extras, the alignment grid and the blinking "REC"
-  indicator, to a separate copy used only for the on-screen `QPixmap`,
+  indicator, to a separate copy used only for the on-screen `VideoView`,
   so neither ends up in the saved file.
 - **`_draw_overlays(frame)`** -> overlays that *are* meant to be part of
   the saved data: the scale bar (via `core/overlays.py::draw_scale_bar`,

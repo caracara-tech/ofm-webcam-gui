@@ -14,10 +14,10 @@ from typing import Optional
 
 import cv2
 import numpy as np
-from PyQt5.QtCore import Qt, QTimer
-from PyQt5.QtGui import QImage, QPixmap
+from PyQt5.QtCore import QTimer
+from PyQt5.QtGui import QImage
 from PyQt5.QtWidgets import (
-    QFileDialog, QHBoxLayout, QLabel, QMainWindow, QMessageBox, QPushButton, QStatusBar, QVBoxLayout, QWidget,
+    QApplication, QFileDialog, QHBoxLayout, QMainWindow, QMessageBox, QPushButton, QStatusBar, QVBoxLayout, QWidget,
 )
 
 from core.app_info import LICENSE_SPDX
@@ -38,12 +38,17 @@ from .panels.log_panel import LogBar
 from .stage_module import StageModule
 from .startup import ModeDialog
 from .threads.camera_thread import ERR_LOST, ERR_NOT_DETECTED, CameraThread
+from .widgets.scroll_column import ScrollColumn
+from .widgets.video_view import VideoView
 
 logger = logging.getLogger(__name__)
 
 APP_TITLE = "OFM Webcam Viewer v" + ".".join(__version__.split(".")[:2])  # e.g. "v0.1"
 SNAPSHOT_FLASH_MS = 120
 RECORDING_BLINK_INTERVAL_MS = 500
+# On first show the window takes the size its content asks for, but never more
+# than this share of the screen it opens on (so it fits 1280x720 as well as 1080p).
+MAX_INITIAL_SCREEN_FRACTION = 0.9
 
 
 class MainWindow(QMainWindow):
@@ -65,6 +70,7 @@ class MainWindow(QMainWindow):
         self._recording_blink_on = False
 
         self.stage_module: Optional[StageModule] = None
+        self._screen_signal_connected = False
         self._log_viewer: Optional[LogViewerDialog] = None
 
         # Set when the user asks to go back to the start screen; the caller
@@ -73,15 +79,16 @@ class MainWindow(QMainWindow):
 
         title_suffix = _("SIMULATION") if mode is AppMode.SIMULATION else mode.label
         self.setWindowTitle(f"{APP_TITLE} - {title_suffix}")
-        self.resize(900, 700)
 
         self._build_ui()
+        self._apply_initial_size()
 
         self.recording_blink_timer = QTimer(self)
         self.recording_blink_timer.timeout.connect(self._toggle_recording_blink)
 
-        # Last, once every panel and signal is wired: the window is fully up
-        # and usable, and only then does the stage start looking for its board.
+        # Last, once every panel and signal is wired: the window is fully up and
+        # usable. The stage only starts looking for its board here if it is the
+        # simulated one; a real board waits for the "Connect to stage" button.
         if self.stage_module is not None:
             self.stage_module.start()
 
@@ -91,24 +98,20 @@ class MainWindow(QMainWindow):
         self.setCentralWidget(central)
         main_layout = QHBoxLayout(central)
 
-        self.video_label = QLabel()
-        self.video_label.setAlignment(Qt.AlignCenter)
-        self.video_label.setStyleSheet("background-color: #111; color: #888;")
-        self.video_label.setText(_("Camera stopped"))
-        self.video_label.setWordWrap(True)
-        self.video_label.setMinimumSize(640, 480)
-        main_layout.addWidget(self.video_label, stretch=3)
-
-        # Plain white overlay used for the snapshot "flash". Kept as a child
-        # of video_label so it always sits exactly on top of the picture;
-        # geometry is resynced whenever video_label's size changes.
-        self.flash_overlay = QLabel(self.video_label)
-        self.flash_overlay.setStyleSheet("background-color: white;")
-        self.flash_overlay.hide()
+        # Layout contract (keep it when adding widgets):
+        #   * the preview takes ALL spare space and never asks for more than a
+        #     constant minimum, whatever it shows (picture, error text, nothing);
+        #   * the controls column takes only the width its content needs and
+        #     scrolls vertically when the window is too short for it.
+        # So no widget's content can resize the window or push another widget.
+        self.video_view = VideoView()
+        self.video_view.show_message(_("Camera stopped"))
+        main_layout.addWidget(self.video_view, stretch=1)
 
         controls = QWidget()
         controls_layout = QVBoxLayout(controls)
-        main_layout.addWidget(controls, stretch=0)
+        self.controls_scroll = ScrollColumn(controls)
+        main_layout.addWidget(self.controls_scroll, stretch=0)
 
         self.change_mode_btn = QPushButton(_("Change mode / language..."))
         self.change_mode_btn.setToolTip(_("Return to the start screen to pick another mode or language"))
@@ -135,18 +138,18 @@ class MainWindow(QMainWindow):
                 get_frame_count=lambda: self.frame_count,
                 is_streaming=lambda: self.camera_thread is not None,
                 stage_is_real=self.mode.stage_is_real,
+                # A real stage connects when the user presses the button; the
+                # simulated one needs no hardware, so it is ready at once.
+                auto_connect=not self.mode.stage_is_real,
             )
             controls_layout.addWidget(self.stage_module.panel)
 
         self.display_panel = DisplayPanel()
-        # Expanding "Advanced" adds height the window does not have yet: re-fit it.
-        self.display_panel.layout_changed.connect(lambda: QTimer.singleShot(0, self._grow_to_fit))
+        # Expanding "Advanced" makes the column taller: the column scrolls, so
+        # the window keeps its size; just make sure the new content is in view.
+        self.display_panel.layout_changed.connect(lambda: self.controls_scroll.reveal(self.display_panel))
         controls_layout.addWidget(self.display_panel)
         controls_layout.addStretch()
-        # Wide enough for the longest label in the active language (translations
-        # can be longer than English), but never narrower than 280 px. The
-        # language is fixed for the whole run, so this is computed once.
-        controls.setFixedWidth(max(280, controls.minimumSizeHint().width()))
 
         self.status = QStatusBar()
         self.setStatusBar(self.status)
@@ -170,12 +173,36 @@ class MainWindow(QMainWindow):
         self.about_btn.clicked.connect(self._show_about)
         self.status.addPermanentWidget(self.about_btn)
 
-    def _grow_to_fit(self) -> None:
-        """Make the window at least as large as its content wants. (adjustSize()
-        is capped at two thirds of the screen, and a layout's minimum height
-        ignores wrapped text, so a panel that just grew would be squeezed.)"""
+    def _apply_initial_size(self) -> None:
+        """First-show size: what the content asks for, capped to the screen the
+        window opens on. Only a starting point - the layout minimum is small
+        (see _build_ui), so the user can resize freely afterwards."""
+        screen = QApplication.screenAt(self.geometry().center()) or QApplication.primaryScreen()
         hint = self.sizeHint()
-        self.resize(max(self.width(), hint.width()), max(self.height(), hint.height()))
+        if screen is None:
+            self.resize(hint)
+            return
+        available = screen.availableGeometry()
+        self.resize(
+            min(hint.width(), int(available.width() * MAX_INITIAL_SCREEN_FRACTION)),
+            min(hint.height(), int(available.height() * MAX_INITIAL_SCREEN_FRACTION)),
+        )
+
+    def showEvent(self, event) -> None:  # noqa: N802 (Qt naming)
+        super().showEvent(event)
+        handle = self.windowHandle()  # only exists once the window is shown
+        if handle is not None and not self._screen_signal_connected:
+            handle.screenChanged.connect(self._on_screen_changed)
+            self._screen_signal_connected = True
+
+    def _on_screen_changed(self, screen) -> None:
+        """The window was dragged to another screen (other resolution and/or DPI):
+        re-derive the controls' width and make sure the window still fits there."""
+        self.controls_scroll.refresh_geometry()
+        if screen is None or self.isMaximized() or self.isFullScreen():
+            return  # the window manager sizes those itself
+        available = screen.availableGeometry()
+        self.resize(min(self.width(), available.width()), min(self.height(), available.height()))
 
     # ----------------------------------------------------- Camera handling --
     def _start_stream(self) -> None:
@@ -183,8 +210,8 @@ class MainWindow(QMainWindow):
         resolution = self.camera_panel.resolution
         backend = self.camera_panel.backend
 
-        self.video_label.setFixedSize(resolution.width, resolution.height)
-        self.flash_overlay.setGeometry(self.video_label.rect())
+        # The resolution is what the camera is asked for; the preview scales to
+        # whatever room the window has and is never resized to match it.
         logger.info(
             "Starting camera stream: device index %d, %s, backend %s", device_index, resolution.label, backend.label,
         )
@@ -205,8 +232,7 @@ class MainWindow(QMainWindow):
         if self.video_writer is not None:
             self._toggle_recording()  # cleanly closes the file
         self.camera_panel.set_streaming(False)
-        self.video_label.setText(_("Camera stopped"))
-        self.video_label.setPixmap(QPixmap())
+        self.video_view.show_message(_("Camera stopped"))
         self.status.showMessage(_("Idle"))
 
     def _on_error(self, kind: str, message: str) -> None:
@@ -218,7 +244,7 @@ class MainWindow(QMainWindow):
             ERR_NOT_DETECTED: _("Camera not detected"),
             ERR_LOST: _("Camera disconnected"),
         }.get(kind, _("Camera error"))
-        self.video_label.setText(f"{headline}\n\n{message}")
+        self.video_view.show_message(f"{headline}\n\n{message}")
         self.status.showMessage(f"{headline}: {message}")
 
     def _on_frame(self, frame: np.ndarray, fps: float) -> None:
@@ -249,7 +275,7 @@ class MainWindow(QMainWindow):
         rgb = cv2.cvtColor(display_frame, cv2.COLOR_BGR2RGB)
         h, w, ch = rgb.shape
         qimg = QImage(rgb.data, w, h, ch * w, QImage.Format_RGB888)
-        self.video_label.setPixmap(QPixmap.fromImage(qimg))
+        self.video_view.show_frame(qimg, buffer=rgb)  # no copy: the view keeps `rgb` alive
 
         self.status.showMessage(_("Frame {count} | {fps:.1f} fps").format(count=self.frame_count, fps=fps))
 
@@ -314,10 +340,7 @@ class MainWindow(QMainWindow):
         self._flash_snapshot()
 
     def _flash_snapshot(self) -> None:
-        self.flash_overlay.setGeometry(self.video_label.rect())
-        self.flash_overlay.show()
-        self.flash_overlay.raise_()
-        QTimer.singleShot(SNAPSHOT_FLASH_MS, self.flash_overlay.hide)
+        self.video_view.flash(SNAPSHOT_FLASH_MS)
 
     def _toggle_recording(self) -> None:
         if self.video_writer is None:

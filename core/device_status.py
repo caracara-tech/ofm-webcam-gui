@@ -16,6 +16,7 @@ from enum import Enum
 
 
 class DeviceState(str, Enum):
+    DISCONNECTED = "disconnected"  # not tried yet: waiting for the user to ask for the connection
     CONNECTING = "connecting"
     CONNECTED = "connected"
     NOT_DETECTED = "not_detected"  # could not be reached when connecting
@@ -35,7 +36,13 @@ class DeviceStatus:
 
     @property
     def can_retry(self) -> bool:
+        """A connection was attempted or held before and failed: offer "Retry"."""
         return self.state in (DeviceState.NOT_DETECTED, DeviceState.LOST)
+
+    @property
+    def can_connect(self) -> bool:
+        """The user may start a connection now (first time, or after a failure)."""
+        return self.state is DeviceState.DISCONNECTED or self.can_retry
 
     def text(self) -> str:
         """Everything, as paragraphs (what a panel shows)."""

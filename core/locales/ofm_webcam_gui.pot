@@ -5,9 +5,9 @@
 #
 msgid ""
 msgstr ""
-"Project-Id-Version: OFM Webcam Viewer 0.1.0\n"
+"Project-Id-Version: OFM Webcam Viewer 0.2.0\n"
 "Report-Msgid-Bugs-To: EMAIL@ADDRESS\n"
-"POT-Creation-Date: 2026-10-27 06:39+0000\n"
+"POT-Creation-Date: 2026-11-10 22:43+0000\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
@@ -37,8 +37,8 @@ msgstr ""
 
 #: core/app_mode.py
 msgid ""
-"Full microscope: live camera and motorized stage control. If the stage board is not found, its "
-"controls stay off until you retry."
+"Full microscope: live camera and motorized stage control. Press Connect to stage to connect the "
+"board; if it is not found, its controls stay off until you retry."
 msgstr ""
 
 #: core/app_mode.py
@@ -229,6 +229,14 @@ msgid "Saving the log to {path}"
 msgstr ""
 
 #: ui/stage_module.py
+msgid "Stage not connected"
+msgstr ""
+
+#: ui/stage_module.py
+msgid "Press Connect to stage to start using the stage controls."
+msgstr ""
+
+#: ui/stage_module.py
 msgid "Stage not detected"
 msgstr ""
 
@@ -247,11 +255,11 @@ msgid ""
 msgstr ""
 
 #: ui/stage_module.py
-msgid "Connecting to the stage..."
+msgid "Wait for the auto-focus to stop, then retry."
 msgstr ""
 
-#: ui/stage_module.py
-msgid "Wait for the auto-focus to stop, then retry."
+#: ui/panels/stage_panel.py ui/stage_module.py
+msgid "Connecting to the stage..."
 msgstr ""
 
 #: ui/stage_module.py
@@ -508,7 +516,7 @@ msgid "R"
 msgstr ""
 
 #: ui/panels/stage_panel.py
-msgid "Stage Control"
+msgid "Connect to stage"
 msgstr ""
 
 #: ui/panels/stage_panel.py
@@ -516,7 +524,7 @@ msgid "Retry connection"
 msgstr ""
 
 #: ui/panels/stage_panel.py
-msgid "Try to connect to the stage again"
+msgid "Stage Control"
 msgstr ""
 
 #: ui/panels/stage_panel.py
@@ -545,6 +553,10 @@ msgstr ""
 
 #: ui/panels/stage_panel.py
 msgid "Automatically re-runs the Z-sweep autofocus after every X/Y jog."
+msgstr ""
+
+#: ui/panels/stage_panel.py
+msgid "Try to connect to the stage again"
 msgstr ""
 
 #: ui/threads/autofocus_thread.py

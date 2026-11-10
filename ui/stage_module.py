@@ -4,13 +4,16 @@ Owns the stage controller, the connection and movement threads, the position
 poll timer, the StagePanel widget and the jog/autofocus handlers. In manual
 mode this class is never instantiated, so there is no stage code to guard.
 
-Connection policy (the same for every mode and every OS): the window always
-opens normally and the stage connects in the background. If it cannot be
-reached the status bar says "Stage not detected" with the reason (the full
-text goes to the log), the stage controls stay off and the panel offers "Retry
-connection". If it stops answering later (cable pulled, board reset) it
-reports "Stage connection lost" the same way. Nothing blocks the start,
-nothing is silently swallowed, and nothing is silently replaced by a simulation.
+Connection policy (the same on every OS): the window always opens normally and
+nothing touches the hardware until asked. With a real stage the panel starts
+"not connected" and its button, "Connect to stage", starts the connection in
+the background (the simulated stage, which needs no hardware, connects by
+itself). If the stage cannot be reached the status bar says "Stage not
+detected" with the reason (the full text goes to the log), the stage controls
+stay off and the same button now reads "Retry connection". If it stops
+answering later (cable pulled, board reset) it reports "Stage connection lost"
+the same way. Nothing blocks the start, nothing is silently swallowed, and
+nothing is silently replaced by a simulation.
 """
 
 from __future__ import annotations
@@ -46,11 +49,20 @@ _abandoned_threads: list[StageConnectThread] = []
 
 
 _LOG_LABELS = {
+    DeviceState.DISCONNECTED: "not connected",
     DeviceState.CONNECTING: "connecting",
     DeviceState.CONNECTED: "connected",
     DeviceState.NOT_DETECTED: "not detected",
     DeviceState.LOST: "connection lost",
 }
+
+
+def _disconnected_status() -> DeviceStatus:
+    return DeviceStatus(
+        DeviceState.DISCONNECTED,
+        _("Stage not connected"),
+        _("Press Connect to stage to start using the stage controls."),
+    )
 
 
 def _not_detected_status(detail: str) -> DeviceStatus:
@@ -85,6 +97,7 @@ class StageModule(QObject):
         get_frame_count: Callable[[], int],
         is_streaming: Callable[[], bool],
         stage_is_real: bool = True,
+        auto_connect: bool = False,
     ) -> None:
         super().__init__(dialog_parent)
         self.stage = stage
@@ -93,10 +106,11 @@ class StageModule(QObject):
         self._get_frame_count = get_frame_count
         self._is_streaming = is_streaming
         self._stage_is_real = stage_is_real
+        self._auto_connect = auto_connect  # connect on start() instead of waiting for the button
 
         self.settings = StageMotionSettings()
         self._movement_busy = False
-        self._status = DeviceStatus(DeviceState.CONNECTING, _("Connecting to the stage..."))
+        self._status = _disconnected_status()
         self._autofocus_thread: Optional[AutoFocusThread] = None
         self._connect_thread: Optional[StageConnectThread] = None
 
@@ -104,7 +118,7 @@ class StageModule(QObject):
         self.panel.jog_requested.connect(self._on_jog_requested)
         self.panel.settings_changed.connect(self._on_settings_changed)
         self.panel.autofocus_requested.connect(self._run_autofocus)
-        self.panel.retry_requested.connect(self.retry_connection)
+        self.panel.connect_requested.connect(self.connect_stage)
         self.panel.show_status(self._status)  # controls stay off until the stage answers
 
         self._thread = StageMovementThread()
@@ -118,9 +132,13 @@ class StageModule(QObject):
 
     # ------------------------------------------------------------ lifecycle --
     def start(self) -> None:
-        """Begin connecting. Separate from __init__ so the caller can connect
-        `status_message` first and not miss the first message."""
-        self._begin_connect(reset=False)
+        """Announce the starting state, and connect now if `auto_connect` is set.
+        Separate from __init__ so the caller can connect `status_message` first
+        and not miss the first message."""
+        if self._auto_connect:
+            self._begin_connect(reset=False)
+        else:
+            self._set_status(self._status)
 
     def shutdown(self) -> None:
         self._timer.stop()
@@ -149,15 +167,17 @@ class StageModule(QObject):
             self.panel.update_position_display(self.stage.get_position_um())
 
     # ---------------------------------------------------------- connection --
-    def retry_connection(self) -> None:
-        """Try again after "not detected" or "connection lost"."""
-        if self._connect_thread is not None or not self._status.can_retry:
+    def connect_stage(self) -> None:
+        """The panel's button: connect for the first time, or try again after
+        "not detected" or "connection lost"."""
+        if self._connect_thread is not None or not self._status.can_connect:
             return
         if self._autofocus_thread is not None:
             self.status_message.emit(_("Wait for the auto-focus to stop, then retry."))
             return
-        logger.info("Retrying the stage connection")
-        self._begin_connect(reset=True)
+        is_retry = self._status.can_retry
+        logger.info("%s the stage connection", "Retrying" if is_retry else "Starting")
+        self._begin_connect(reset=is_retry)  # a retry first closes what is left of the last attempt
 
     def _begin_connect(self, reset: bool) -> None:
         if self._connect_thread is not None:

@@ -49,15 +49,18 @@ def _epilog() -> str:
     return f"""\
 MODES  (pick one in the startup dialog, or skip it with --mode)
   automated     The full microscope: live camera and real stage control.
-                Needs the stage board connected; if it cannot be reached you
-                are asked to retry, choose another mode, or quit. If it
-                stops responding while running, an error is shown and the
-                stage controls are disabled.
+                Needs the stage board plugged in. The window opens at once
+                and the stage waits for the "Connect to stage" button; if the
+                board cannot be reached the controls stay off and the button
+                becomes "Retry connection". If it stops responding while
+                running, an error is shown and the stage controls are
+                disabled.
   manual        For devices without motors: camera preview, snapshots and
                 recording. Stage controls are not shown.
   simulation    Command line only (not listed in the startup dialog). No
                 hardware needed: the full interface with a simulated stage;
-                nothing physical moves. Handy for trying the software.
+                nothing physical moves (the stage connects by itself).
+                Handy for trying the software.
   The "Change mode / language..." button in the window returns to the
   startup dialog without closing the program.
 
@@ -137,6 +140,10 @@ def _show_text_dialog(text: str, title: str) -> None:
     from PyQt5.QtGui import QFontDatabase
     from PyQt5.QtWidgets import QApplication, QDialog, QPlainTextEdit, QPushButton, QVBoxLayout
 
+    from ui.scaling import configure_high_dpi
+
+    if QApplication.instance() is None:
+        configure_high_dpi()
     app = QApplication.instance() or QApplication(sys.argv)
     dialog = QDialog()
     dialog.setWindowTitle(title)
@@ -238,11 +245,13 @@ def _run(args: argparse.Namespace, log_session: LogSession) -> int:
     from PyQt5.QtWidgets import QApplication
 
     from ui.language import apply_language, saved_language, system_locale
+    from ui.scaling import configure_high_dpi
 
     logger.info("OpenCV %s | Qt %s | PyQt %s", cv2.__version__, QT_VERSION_STR, PYQT_VERSION_STR)
 
     requested = AppMode(args.mode) if args.mode else (AppMode.SIMULATION if args.simulate else None)
 
+    configure_high_dpi()  # must come before the QApplication exists
     app = QApplication(sys.argv)
     # Priority: --lang, then the remembered choice, then the OS language, then English.
     language = apply_language(resolve_language(args.lang, saved_language(), system_locale()))

@@ -116,7 +116,7 @@ ls -l /dev/ttyACM0   # or whichever port your stage is on
 ```
 
 Without this, Automated mode cannot open the port and shows an explicit
-error at startup (with a hint about this group); see
+error when you press **Connect to stage** (with a hint about this group); see
 [Troubleshooting](#troubleshooting) below.
 
 ---
@@ -140,7 +140,7 @@ On launch you choose a mode in the start screen (or skip it with `--mode`):
 
 | Mode | For | Stage controls | Behaviour |
 |---|---|---|---|
-| **Automated** | Full motorized microscope | Shown, real hardware | If the stage can't be reached at startup you get an error with *Retry / Choose another mode / Quit*. If it stops responding while running, an explicit error is shown and the stage controls are disabled. |
+| **Automated** | Full motorized microscope | Shown, real hardware | The window opens at once and the stage waits for the **Connect to stage** button. If the stage can't be reached the controls stay off, the error is shown in the status bar and the log, and the button becomes **Retry connection**. If it stops responding while running, an explicit error is shown and the stage controls are disabled. |
 | **Manual** | Device without motors | Hidden | Camera selection, snapshots and recording only. |
 | **Simulation** | Trying the software without hardware | Shown, simulated stage | Command line only (`--mode simulation` or `--simulate`); not listed in the start screen. Nothing physical moves; the window title ends in `SIMULATION`. |
 

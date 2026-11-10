@@ -103,7 +103,7 @@ groups        # debería mostrar "dialout"
 ls -l /dev/ttyACM0   # o el puerto al que esté conectada la plataforma
 ```
 
-Sin estos permisos, el modo automatizado no podrá abrir el puerto y mostrará un error explícito al iniciarse, con una indicación sobre el grupo necesario. Consulta la sección [Solución de problemas](#solución-de-problemas).
+Sin estos permisos, el modo automatizado no podrá abrir el puerto y mostrará un error explícito al pulsar **Connect to stage**, con una indicación sobre el grupo necesario. Consulta la sección [Solución de problemas](#solución-de-problemas).
 
 ---
 
@@ -126,7 +126,7 @@ Al iniciar, puedes seleccionar un modo en la pantalla de inicio o saltarte esa s
 
 | Modo | Uso previsto | Controles de la plataforma | Comportamiento |
 |---|---|---|---|
-| **Automatizado** | Microscopio totalmente motorizado | Visibles, hardware real. | Si no se puede acceder a la plataforma al iniciar, aparece un error con las opciones *Reintentar / Elegir otro modo / Salir*. Si deja de responder mientras está en ejecución, se muestra un error explícito y los controles de la plataforma quedan deshabilitados. |
+| **Automatizado** | Microscopio totalmente motorizado | Visibles, hardware real. | La ventana se abre de inmediato y la plataforma espera al botón **Connect to stage**. Si no se puede acceder a ella, los controles permanecen desactivados, el error aparece en la barra de estado y en el registro, y el botón pasa a ser **Retry connection**. Si deja de responder mientras está en ejecución, se muestra un error explícito y los controles de la plataforma quedan deshabilitados. |
 | **Manual** | Dispositivo sin motores | Oculto | Solo selección de cámara, captura de fotografías y grabación. |
 | **Simulación** | Probar el software sin hardware | Visibles, plataforma simulada | Solo desde la línea de comandos (`--mode simulation` o `--simulate`); no aparece en la pantalla de inicio. No se mueve ningún componente físico y el título de la ventana termina en `SIMULATION`. |
 

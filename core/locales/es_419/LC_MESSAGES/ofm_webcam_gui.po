@@ -43,11 +43,12 @@ msgstr "Simulación"
 
 #: core/app_mode.py
 msgid ""
-"Full microscope: live camera and motorized stage control. If the stage board is not found, its "
-"controls stay off until you retry."
+"Full microscope: live camera and motorized stage control. Press Connect to stage to connect the "
+"board; if it is not found, its controls stay off until you retry."
 msgstr ""
-"Microscopio completo: cámara en vivo y control de la plataforma motorizada. Si no se encuentra la "
-"placa de la plataforma, sus controles permanecen desactivados hasta que reintente."
+"Microscopio completo: cámara en vivo y control de la plataforma motorizada. Presione Conectar la "
+"plataforma para conectar la placa; si no se encuentra, sus controles permanecen desactivados hasta "
+"que reintente."
 
 #: core/app_mode.py
 msgid "Device without motors: camera preview, snapshots and recording. No stage controls."
@@ -57,7 +58,9 @@ msgstr ""
 
 #: core/app_mode.py
 msgid "No hardware needed: full interface with a simulated stage (nothing physical moves)."
-msgstr "No requiere hardware: interfaz completa con una plataforma simulada (no se mueve nada físicamente)."
+msgstr ""
+"No requiere hardware: interfaz completa con una plataforma simulada (no se mueve nada "
+"físicamente)."
 
 #. Name of THIS language, written in that language, shown in the language selector (e.g. "Español
 #. (Latinoamérica)"). Do not translate literally.
@@ -89,8 +92,8 @@ msgid ""
 "Lost communication with the stage during a move ({error}). Check the USB cable and the board's "
 "power."
 msgstr ""
-"Se perdió la comunicación con la plataforma durante un movimiento ({error}). Revise el cable USB y "
-"la alimentación de la placa."
+"Se perdió la comunicación con la plataforma durante un movimiento ({error}). Revise el cable USB "
+"y la alimentación de la placa."
 
 #: hardware/stage/sangaboard.py
 msgid "no response"
@@ -244,6 +247,14 @@ msgid "Saving the log to {path}"
 msgstr "Guardando el registro en {path}"
 
 #: ui/stage_module.py
+msgid "Stage not connected"
+msgstr "Plataforma no conectada"
+
+#: ui/stage_module.py
+msgid "Press Connect to stage to start using the stage controls."
+msgstr "Presione Conectar la plataforma para comenzar a usar los controles de la plataforma."
+
+#: ui/stage_module.py
 msgid "Stage not detected"
 msgstr "Plataforma no detectada"
 
@@ -265,12 +276,12 @@ msgstr ""
 "posición real de la plataforma."
 
 #: ui/stage_module.py
-msgid "Connecting to the stage..."
-msgstr "Conectando con la plataforma..."
-
-#: ui/stage_module.py
 msgid "Wait for the auto-focus to stop, then retry."
 msgstr "Espere a que el enfoque automático se detenga y vuelva a intentarlo."
+
+#: ui/panels/stage_panel.py ui/stage_module.py
+msgid "Connecting to the stage..."
+msgstr "Conectando con la plataforma..."
 
 #: ui/stage_module.py
 msgid "Simulated stage ready"
@@ -530,16 +541,16 @@ msgid "R"
 msgstr "De"
 
 #: ui/panels/stage_panel.py
-msgid "Stage Control"
-msgstr "Control de plataforma"
+msgid "Connect to stage"
+msgstr "Conectar la plataforma"
 
 #: ui/panels/stage_panel.py
 msgid "Retry connection"
 msgstr "Reintentar conexión"
 
 #: ui/panels/stage_panel.py
-msgid "Try to connect to the stage again"
-msgstr "Intentar conectar con la plataforma nuevamente"
+msgid "Stage Control"
+msgstr "Control de plataforma"
 
 #: ui/panels/stage_panel.py
 msgid "XY Step (µm):"
@@ -570,6 +581,10 @@ msgid "Automatically re-runs the Z-sweep autofocus after every X/Y jog."
 msgstr ""
 "Vuelve a ejecutar automáticamente el barrido de enfoque automático en Z después de cada "
 "desplazamiento en X/Y."
+
+#: ui/panels/stage_panel.py
+msgid "Try to connect to the stage again"
+msgstr "Intentar conectar con la plataforma nuevamente"
 
 #: ui/threads/autofocus_thread.py
 #, python-brace-format

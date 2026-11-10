@@ -7,7 +7,7 @@ from PyQt5.QtWidgets import (
     QCheckBox, QGridLayout, QGroupBox, QHBoxLayout, QLabel, QPushButton, QSpinBox, QVBoxLayout, QWidget,
 )
 
-from core.device_status import DeviceStatus
+from core.device_status import DeviceState, DeviceStatus
 from core.i18n import _, pgettext
 from core.types import Direction, Position, StageMotionSettings
 
@@ -47,18 +47,31 @@ def direction_label(direction: Direction) -> str:
     }.get(direction) or direction_letter(direction)
 
 
+def _connect_button_text(status: DeviceStatus) -> str:
+    """Text of the connect button for each state (built on demand, so it follows
+    the active language)."""
+    if status.state is DeviceState.DISCONNECTED:
+        return _("Connect to stage")
+    if status.state is DeviceState.CONNECTING:
+        return _("Connecting to the stage...")
+    return _("Retry connection")
+
+
 class StagePanel(QGroupBox):
     """Emits `jog_requested(Direction)` on button press and
     `settings_changed(StageMotionSettings)` whenever the user edits a spinbox.
 
-    `show_status()` enables the controls only while the stage is connected and
-    shows a Retry button when it is not detected or was lost.
+    `show_status()` enables the controls only while the stage is connected. While
+    it is not, one button takes their place: "Connect to stage" before the first
+    attempt, "Connecting..." (disabled) during it, "Retry connection" after a
+    failure. Being the same button in the same spot, the panel does not jump
+    around between those states.
     """
 
     jog_requested = pyqtSignal(object)  # Direction
     settings_changed = pyqtSignal(object)  # StageMotionSettings
     autofocus_requested = pyqtSignal()
-    retry_requested = pyqtSignal()
+    connect_requested = pyqtSignal()
 
     def __init__(self, initial_settings: StageMotionSettings, parent=None):
         super().__init__(_("Stage Control"), parent)
@@ -67,11 +80,10 @@ class StagePanel(QGroupBox):
 
         # Only shown while the stage is not usable. The reason itself goes to the
         # status bar and the log, like every other error; no text area here.
-        self.retry_btn = QPushButton(_("Retry connection"))
-        self.retry_btn.setToolTip(_("Try to connect to the stage again"))
-        self.retry_btn.clicked.connect(self.retry_requested.emit)
-        outer.addWidget(self.retry_btn)
-        self.retry_btn.hide()
+        self.connect_btn = QPushButton()
+        self.connect_btn.clicked.connect(self.connect_requested.emit)
+        outer.addWidget(self.connect_btn)
+        self.connect_btn.hide()
 
         # Everything else lives in one container so it can be enabled or
         # disabled as a unit without touching the status area.
@@ -83,7 +95,8 @@ class StagePanel(QGroupBox):
         self._direction_buttons: list[QPushButton] = []
         for direction, row, col in _DIRECTION_LAYOUT:
             btn = QPushButton(direction_label(direction))
-            btn.setMaximumWidth(60)
+            # No pixel cap: the buttons share the column width evenly, so they
+            # look right at any DPI/font size instead of at one screen's.
             btn.clicked.connect(lambda checked=False, d=direction: self.jog_requested.emit(d))
             layout.addWidget(btn, row, col)
             self._direction_buttons.append(btn)
@@ -146,11 +159,13 @@ class StagePanel(QGroupBox):
         self.pos_z_label.setText(f"Z: {position_um.z:.2f}")
 
     def show_status(self, status: DeviceStatus) -> None:
-        """Enable the controls only while the stage is connected, and offer
-        "Retry connection" when it is not detected or was lost."""
-        self.retry_btn.setVisible(status.can_retry)
-        # What to check is the button's tooltip; the reason is in the status bar and the log.
-        self.retry_btn.setToolTip(status.description or _("Try to connect to the stage again"))
+        """Enable the controls only while the stage is connected; otherwise show
+        the connect button in the state that matches `status`."""
+        self.connect_btn.setVisible(not status.is_ok)
+        self.connect_btn.setEnabled(status.can_connect)
+        self.connect_btn.setText(_connect_button_text(status))
+        # What to do or check is the button's tooltip; the reason is in the status bar and the log.
+        self.connect_btn.setToolTip(status.description or _("Try to connect to the stage again"))
         self.set_enabled_all(status.is_ok)
 
     def set_enabled_all(self, enabled: bool) -> None:
