@@ -88,6 +88,11 @@ def _lost_status(detail: str) -> DeviceStatus:
 
 class StageModule(QObject):
     status_message = pyqtSignal(str)
+    # Autofocus lifecycle, for whoever shows it (the window's preview badge).
+    # Exactly one `autofocus_started` and one `autofocus_ended` per run.
+    autofocus_started = pyqtSignal()
+    autofocus_progress = pyqtSignal(str)  # short detail, e.g. "coarse 3/12"
+    autofocus_ended = pyqtSignal(bool)  # True if it completed, False if it failed
 
     def __init__(
         self,
@@ -290,11 +295,13 @@ class StageModule(QObject):
             self._handle_stage_failure(_("The stage is not connected."))
             return
         if not self._is_streaming() or self._get_frame() is None:
+            logger.warning("Autofocus not started: the camera stream is not running")
             self.status_message.emit(_("Start the camera stream before running autofocus."))
             return
 
         self._set_movement_busy(True)
         self.status_message.emit(_("Running auto-focus..."))
+        self.autofocus_started.emit()
 
         self._autofocus_thread = AutoFocusThread(
             self.stage, self._get_frame, AutoFocusSettings(),
@@ -309,10 +316,12 @@ class StageModule(QObject):
         self._autofocus_thread.finished.connect(self._autofocus_thread.deleteLater)
         self._autofocus_thread.start()
 
-    def _on_autofocus_progress(self, step: int, total: int) -> None:
+    def _on_autofocus_progress(self, phase: str, step: int, total: int) -> None:
         self.status_message.emit(_("Auto-focus: sampling position {step}/{total}...").format(step=step, total=total))
+        self.autofocus_progress.emit(f"{phase} {step}/{total}")
 
-    def _on_autofocus_finished(self, message: str) -> None:
+    def _on_autofocus_finished(self, succeeded: bool, message: str) -> None:
+        self.autofocus_ended.emit(succeeded)
         self.status_message.emit(message)
         self.refresh_position()
         self._set_movement_busy(False)

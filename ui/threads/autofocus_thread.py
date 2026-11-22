@@ -8,12 +8,14 @@ stage.move_steps() blocks, and we don't want that blocking the UI.
 
 from __future__ import annotations
 
+import logging
 from typing import Callable, Optional
 
 import numpy as np
 from PyQt5.QtCore import QThread, pyqtSignal
 
 from core.autofocus import (
+    AutoFocusPhase,
     AutoFocusPlan,
     AutoFocusSettings,
     best_offset,
@@ -27,6 +29,8 @@ from core.types import Axis, Direction
 from hardware.abstract import StageController
 from core.i18n import _, ngettext
 from hardware.errors import StageCommunicationError
+
+logger = logging.getLogger(__name__)
 
 
 class AutoFocusThread(QThread):
@@ -44,8 +48,8 @@ class AutoFocusThread(QThread):
     position, which smears out the true focus peak and makes the sweep
     converge on a blurrier, less accurate position."""
 
-    progress = pyqtSignal(int, int)  # (current_step, total_steps)
-    finished_focus = pyqtSignal(str)  # human-readable result/status message
+    progress = pyqtSignal(str, int, int)  # (AutoFocusPhase value, current_step, total_steps) within the running sweep
+    finished_focus = pyqtSignal(bool, str)  # (succeeded, human-readable result/status message)
     stage_failed = pyqtSignal(str)  # emitted (before finished_focus) if the stage stops responding
 
     def __init__(
@@ -80,7 +84,9 @@ class AutoFocusThread(QThread):
                 break  # a genuinely new frame has arrived
         return self.frame_getter()
 
-    def _run_one_sweep(self, plan: AutoFocusPlan) -> tuple[int, float, list[float]]:
+    def _run_one_sweep(
+        self, plan: AutoFocusPlan, phase: AutoFocusPhase, sweep_number: int,
+    ) -> tuple[int, float, list[float]]:
         """Sweep `plan`'s window around the stage's *current* position,
         leave the stage parked at whichever offset scored best, and return
         (chosen_offset, best_score, all_scores). Runs entirely relative to
@@ -90,6 +96,8 @@ class AutoFocusThread(QThread):
         s = self.settings
         offsets = sweep_offsets(plan.range_steps)
         scores: list[float] = []
+        # One log line per sweep (not per sample, which would flood the log).
+        logger.info("Autofocus in progress: %s sweep %d, %d positions", phase.value, sweep_number, len(offsets))
 
         if plan.range_steps > 0:
             self.stage.move_steps(
@@ -99,7 +107,7 @@ class AutoFocusThread(QThread):
         for i, _offset in enumerate(offsets):
             frame = self._get_fresh_frame(s.settle_s)
             scores.append(focus_score(frame, s.roi_fraction) if frame is not None else 0.0)
-            self.progress.emit(i + 1, len(offsets))
+            self.progress.emit(phase.value, i + 1, len(offsets))
             if i < len(offsets) - 1:
                 self.stage.move_steps(Direction.FORWARD, plan.step_size, s.delay_per_step_s)
 
@@ -112,9 +120,11 @@ class AutoFocusThread(QThread):
 
     def run(self) -> None:
         s = self.settings
-        nm_per_step = self.stage.calibration.nm_per_step(Axis.Z)
+        logger.info("Autofocus started")
 
         try:
+            nm_per_step = self.stage.calibration.nm_per_step(Axis.Z)
+
             # --- Stage 1: coarse search --------------------------------
             # Wide window, coarse steps: find the general region the true
             # focus lies in. Keep expanding the window and sweeping again
@@ -132,7 +142,9 @@ class AutoFocusThread(QThread):
             while keep_expanding and coarse_passes < max(1, s.max_coarse_passes):
                 coarse_passes += 1
                 plan = plan_autofocus_sweep(coarse_range_um, s.coarse_step_um, nm_per_step)
-                chosen, best_score, scores = self._run_one_sweep(plan)
+                chosen, best_score, scores = self._run_one_sweep(
+                    plan, AutoFocusPhase.COARSE, sweep_number=coarse_passes,
+                )
                 keep_expanding = (
                     is_at_search_boundary(chosen, plan.range_steps) or has_weak_signal(scores)
                 )
@@ -144,10 +156,17 @@ class AutoFocusThread(QThread):
             # finely-sampled sweep to nail down the actual peak to
             # sub-coarse-step precision.
             fine_plan = plan_autofocus_sweep(s.fine_range_um, s.fine_step_um, nm_per_step)
-            _fine_chosen, fine_score, _fine_scores = self._run_one_sweep(fine_plan)
+            _fine_chosen, fine_score, _fine_scores = self._run_one_sweep(
+                fine_plan, AutoFocusPhase.FINE, sweep_number=coarse_passes + 1,
+            )
             best_score = max(best_score, fine_score)
 
+            logger.info(
+                "Autofocus completed (sharpness %.1f, %d coarse pass%s + fine pass)",
+                best_score, coarse_passes, "" if coarse_passes == 1 else "es",
+            )
             self.finished_focus.emit(
+                True,
                 ngettext(
                     "Auto-focus complete (sharpness {sharpness:.1f}, {passes} coarse pass + fine pass)",
                     "Auto-focus complete (sharpness {sharpness:.1f}, {passes} coarse passes + fine pass)",
@@ -155,7 +174,9 @@ class AutoFocusThread(QThread):
                 ).format(sharpness=best_score, passes=coarse_passes)
             )
         except StageCommunicationError as e:
+            logger.error("Autofocus failed: lost communication with the stage (%s)", e)
             self.stage_failed.emit(str(e))
-            self.finished_focus.emit(_("Auto-focus aborted: lost communication with the stage"))
+            self.finished_focus.emit(False, _("Auto-focus aborted: lost communication with the stage"))
         except Exception as e:
-            self.finished_focus.emit(_("Auto-focus error: {error}").format(error=e))
+            logger.error("Autofocus failed: %s: %s", type(e).__name__, e)
+            self.finished_focus.emit(False, _("Auto-focus error: {error}").format(error=e))

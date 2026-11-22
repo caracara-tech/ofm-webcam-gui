@@ -93,6 +93,12 @@ class CameraPanel(QGroupBox):
         self._streaming = streaming
         self.start_btn.setText(_("Stop Stream") if streaming else _("Start Stream"))
 
+    def set_locked(self, locked: bool) -> None:
+        """Disable the whole panel (device, backend, resolution, Start/Stop) while
+        something needs the stream to keep running, e.g. an autofocus sweep."""
+        self.setEnabled(not locked)
+        self.setToolTip(_("Unavailable while auto-focus is running") if locked else "")
+
     @property
     def device_index(self) -> int:
         index = self.device_combo.currentData()

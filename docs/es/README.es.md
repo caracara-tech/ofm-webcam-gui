@@ -39,7 +39,8 @@ ofm-webcam-gui/
 │   ├── config.py               #   Resoluciones, listas de backends, puertos predeterminados y carpeta de salida
 │   ├── stage_motion.py         #   plan_jog(): cálculos de planificación de movimientos incrementales, comprobables mediante pruebas unitarias
 │   ├── autofocus.py            #   Cálculos del enfoque automático: planificación del barrido, evaluación del enfoque y convergencia
-│   ├── overlays.py             #   draw_grid() / draw_scale_bar(): dibujo de cuadrículas y barras de escala
+│   ├── overlays.py             #   draw_grid() / draw_scale_bar() / draw_status_badges(): dibujo de cuadrículas, barras de escala e indicadores de estado
+│   ├── activity.py             #   Activity / ActivityTracker: qué actividades (REC, AUTOFOCUS...) muestran un indicador en la vista previa
 │   └── scale_calibration.py    #   validate_um_per_pixel(): calibración física opcional para la barra de escala
 ├── hardware/                   # Capa de abstracción del hardware (sin importaciones de PyQt)
 │   ├── abstract.py             #   StageController / CameraController / SensorController ABCs

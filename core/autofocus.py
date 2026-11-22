@@ -11,10 +11,19 @@ tested without a camera, a stage, or Qt.
 from __future__ import annotations
 
 from dataclasses import dataclass
+from enum import Enum
 from typing import List
 
 import cv2
 import numpy as np
+
+
+class AutoFocusPhase(str, Enum):
+    """The two stages of the search; the value is the short name used in the
+    log and on the preview badge."""
+
+    COARSE = "coarse"
+    FINE = "fine"
 
 
 @dataclass(frozen=True)

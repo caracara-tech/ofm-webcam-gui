@@ -5,9 +5,9 @@
 #
 msgid ""
 msgstr ""
-"Project-Id-Version: OFM Webcam Viewer 0.2.0\n"
+"Project-Id-Version: OFM Webcam Viewer 0.2.1\n"
 "Report-Msgid-Bugs-To: EMAIL@ADDRESS\n"
-"POT-Creation-Date: 2026-11-10 22:43+0000\n"
+"POT-Creation-Date: 2026-11-21 18:37+0000\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
@@ -397,6 +397,10 @@ msgstr ""
 
 #: ui/panels/camera_panel.py
 msgid "Stop Stream"
+msgstr ""
+
+#: ui/panels/camera_panel.py
+msgid "Unavailable while auto-focus is running"
 msgstr ""
 
 #: ui/panels/capture_panel.py

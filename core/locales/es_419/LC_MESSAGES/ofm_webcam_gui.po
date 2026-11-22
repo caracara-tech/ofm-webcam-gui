@@ -47,8 +47,8 @@ msgid ""
 "board; if it is not found, its controls stay off until you retry."
 msgstr ""
 "Microscopio completo: cámara en vivo y control de la plataforma motorizada. Presione Conectar la "
-"plataforma para conectar la placa; si no se encuentra, sus controles permanecen desactivados hasta "
-"que reintente."
+"plataforma para conectar la placa; si no se encuentra, sus controles permanecen desactivados "
+"hasta que reintente."
 
 #: core/app_mode.py
 msgid "Device without motors: camera preview, snapshots and recording. No stage controls."
@@ -419,6 +419,10 @@ msgstr "Iniciar transmisión"
 #: ui/panels/camera_panel.py
 msgid "Stop Stream"
 msgstr "Detener transmisión"
+
+#: ui/panels/camera_panel.py
+msgid "Unavailable while auto-focus is running"
+msgstr "No disponible mientras se ejecuta el enfoque automático"
 
 #: ui/panels/capture_panel.py
 msgid "Snapshots & Recording"

@@ -44,7 +44,8 @@ ofm-webcam-gui/
 │   ├── config.py               #   Resolutions, backend lists, default ports, default output folder
 │   ├── stage_motion.py         #   plan_jog(), pure jog-planning math (unit-testable)
 │   ├── autofocus.py            #   Autofocus search math: sweep planning, focus scoring, convergence
-│   ├── overlays.py             #   draw_grid() / draw_scale_bar(), pure preview-overlay drawing
+│   ├── overlays.py             #   draw_grid() / draw_scale_bar() / draw_status_badges(), pure preview-overlay drawing
+│   ├── activity.py             #   Activity / ActivityTracker: which activities (REC, AUTOFOCUS...) show a preview badge
 │   └── scale_calibration.py    #   validate_um_per_pixel(), optional physical override for the scale bar
 ├── hardware/                   # Hardware abstraction layer (no PyQt imports)
 │   ├── abstract.py             #   StageController / CameraController / SensorController ABCs

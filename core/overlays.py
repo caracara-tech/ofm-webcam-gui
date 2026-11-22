@@ -23,8 +23,9 @@ character depending on platform.
 
 from __future__ import annotations
 
+from dataclasses import dataclass
 from enum import Enum
-from typing import List, Optional
+from typing import List, Optional, Sequence, Tuple
 
 import cv2
 import numpy as np
@@ -42,6 +43,8 @@ class ScaleBarColor(str, Enum):
         """The colour as an OpenCV (blue, green, red) tuple."""
         return (255, 255, 255) if self is ScaleBarColor.WHITE else (0, 0, 0)
 
+
+BGR = Tuple[int, int, int]
 
 GRID_COLOR = (0, 200, 0)
 SCALE_BAR_COLOR = ScaleBarColor.WHITE.bgr  # default
@@ -146,4 +149,45 @@ def draw_scale_bar(
     text_x = x1 + max(0, (length_px - text_size[0]) // 2)
     text_y = y - 12
     cv2.putText(frame, label, (text_x, text_y), cv2.FONT_HERSHEY_SIMPLEX, 0.6, color, 2, cv2.LINE_AA)
+    return frame
+
+
+@dataclass(frozen=True)
+class Badge:
+    """One status indicator for the preview: a coloured dot and a text label
+    (e.g. a red dot and "REC"). `dot_visible` lets the caller blink the dot
+    while the label stays put, so the rows never change size or position."""
+
+    label: str
+    color: BGR
+    dot_visible: bool = True
+
+
+BADGE_MARGIN_PX = 16
+BADGE_ROW_HEIGHT_PX = 30
+BADGE_DOT_RADIUS_PX = 9
+BADGE_FONT_SCALE = 0.7
+BADGE_FONT_THICKNESS = 2
+
+
+def badge_row_origins(count: int, margin_px: int = BADGE_MARGIN_PX, row_height_px: int = BADGE_ROW_HEIGHT_PX) -> List[Tuple[int, int]]:
+    """Centre (x, y) of the dot of each of `count` badges, stacked downwards
+    from the top-left corner, one fixed-height row each. Pure geometry, so
+    "never overlap" can be checked without drawing anything."""
+    x = margin_px + BADGE_DOT_RADIUS_PX
+    return [(x, margin_px + BADGE_DOT_RADIUS_PX + i * row_height_px) for i in range(max(0, count))]
+
+
+def draw_status_badges(frame: np.ndarray, badges: Sequence[Badge]) -> np.ndarray:
+    """Draw `badges` in a column at the top-left of `frame`, in place, and
+    return it. Each badge gets its own row (see `badge_row_origins`), so any
+    number of them can be shown together without overlapping. Labels are ASCII
+    for the same reason as the scale bar (see the module docstring)."""
+    for badge, (x, y) in zip(badges, badge_row_origins(len(badges))):
+        if badge.dot_visible:
+            cv2.circle(frame, (x, y), BADGE_DOT_RADIUS_PX, badge.color, -1, cv2.LINE_AA)
+        cv2.putText(
+            frame, badge.label, (x + BADGE_DOT_RADIUS_PX + 7, y + 8),
+            cv2.FONT_HERSHEY_SIMPLEX, BADGE_FONT_SCALE, badge.color, BADGE_FONT_THICKNESS, cv2.LINE_AA,
+        )
     return frame

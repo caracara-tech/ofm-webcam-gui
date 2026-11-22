@@ -20,12 +20,13 @@ from PyQt5.QtWidgets import (
     QApplication, QFileDialog, QHBoxLayout, QMainWindow, QMessageBox, QPushButton, QStatusBar, QVBoxLayout, QWidget,
 )
 
+from core.activity import Activity, ActivityTracker
 from core.app_info import LICENSE_SPDX
 from core.app_mode import AppMode
 from core.config import DEFAULT_OUTPUT_DIR
 from core.i18n import _, current_language
 from core.logging_setup import LogSession
-from core.overlays import draw_grid, draw_scale_bar
+from core.overlays import draw_grid, draw_scale_bar, draw_status_badges
 from core.version import __version__
 from hardware.stage import create_stage
 from .dialogs.about import AboutDialog
@@ -45,7 +46,7 @@ logger = logging.getLogger(__name__)
 
 APP_TITLE = "OFM Webcam Viewer v" + ".".join(__version__.split(".")[:2])  # e.g. "v0.1"
 SNAPSHOT_FLASH_MS = 120
-RECORDING_BLINK_INTERVAL_MS = 500
+BADGE_BLINK_INTERVAL_MS = 500  # blink period of the preview's status-badge dots (REC, AUTOFOCUS)
 # On first show the window takes the size its content asks for, but never more
 # than this share of the screen it opens on (so it fits 1280x720 as well as 1080p).
 MAX_INITIAL_SCREEN_FRACTION = 0.9
@@ -67,7 +68,7 @@ class MainWindow(QMainWindow):
         self.last_frame: Optional[np.ndarray] = None
         self.frame_count = 0
         self.snapshot_count = 0
-        self._recording_blink_on = False
+        self.activity = ActivityTracker()  # what the preview's status badges show
 
         self.stage_module: Optional[StageModule] = None
         self._screen_signal_connected = False
@@ -83,8 +84,8 @@ class MainWindow(QMainWindow):
         self._build_ui()
         self._apply_initial_size()
 
-        self.recording_blink_timer = QTimer(self)
-        self.recording_blink_timer.timeout.connect(self._toggle_recording_blink)
+        self.badge_blink_timer = QTimer(self)
+        self.badge_blink_timer.timeout.connect(self.activity.toggle_blink)
 
         # Last, once every panel and signal is wired: the window is fully up and
         # usable. The stage only starts looking for its board here if it is the
@@ -114,7 +115,8 @@ class MainWindow(QMainWindow):
         main_layout.addWidget(self.controls_scroll, stretch=0)
 
         self.change_mode_btn = QPushButton(_("Change mode / language..."))
-        self.change_mode_btn.setToolTip(_("Return to the start screen to pick another mode or language"))
+        self._change_mode_tooltip = _("Return to the start screen to pick another mode or language")
+        self.change_mode_btn.setToolTip(self._change_mode_tooltip)
         self.change_mode_btn.clicked.connect(self._change_mode)
         controls_layout.addWidget(self.change_mode_btn)
 
@@ -155,6 +157,9 @@ class MainWindow(QMainWindow):
         self.setStatusBar(self.status)
         if self.stage_module is not None:
             self.stage_module.status_message.connect(self.status.showMessage)
+            self.stage_module.autofocus_started.connect(self._on_autofocus_started)
+            self.stage_module.autofocus_progress.connect(lambda d: self.activity.update(Activity.AUTOFOCUS, d))
+            self.stage_module.autofocus_ended.connect(self._on_autofocus_ended)
         if self.mode is AppMode.SIMULATION:
             self.status.showMessage(_("SIMULATION MODE"))
         elif self.mode is AppMode.MANUAL:
@@ -255,22 +260,17 @@ class MainWindow(QMainWindow):
         if self.video_writer is not None:
             self.video_writer.write(recorded_frame)
 
-        # Grid and the blinking "REC" dot are live-preview aids only - both
-        # are overlaid after writing so neither ends up baked into the
-        # saved video/snapshot (the scale bar, by contrast, is meaningful
+        # The grid and the status badges (REC, AUTOFOCUS) are live-preview aids
+        # only - both are overlaid after writing so neither ends up baked into
+        # the saved video/snapshot (the scale bar, by contrast, is meaningful
         # measurement data and *is* baked in - see _draw_overlays).
         display_frame = recorded_frame
-        needs_copy = self.display_panel.show_grid or (self.video_writer is not None and self._recording_blink_on)
-        if needs_copy:
+        badges = self.activity.badges()
+        if self.display_panel.show_grid or badges:
             display_frame = recorded_frame.copy()
         if self.display_panel.show_grid:
             display_frame = draw_grid(display_frame, self.display_panel.grid_spacing_px)
-        if self.video_writer is not None and self._recording_blink_on:
-            cv2.circle(display_frame, (24, 24), 9, (0, 0, 255), -1, cv2.LINE_AA)
-            cv2.putText(
-                display_frame, "REC", (40, 32),
-                cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 0, 255), 2, cv2.LINE_AA,
-            )
+        draw_status_badges(display_frame, badges)
 
         rgb = cv2.cvtColor(display_frame, cv2.COLOR_BGR2RGB)
         h, w, ch = rgb.shape
@@ -292,8 +292,33 @@ class MainWindow(QMainWindow):
             )
         return frame
 
-    def _toggle_recording_blink(self) -> None:
-        self._recording_blink_on = not self._recording_blink_on
+    # ----------------------------------------------------------- Autofocus --
+    def _on_autofocus_started(self) -> None:
+        # The sweep scores live frames: stopping or changing the stream under it
+        # would make it run on stale pictures, so the camera panel is locked.
+        self.camera_panel.set_locked(True)
+        # Leaving the session would close the window (and the stage) mid-sweep.
+        self.change_mode_btn.setEnabled(False)
+        self.change_mode_btn.setToolTip(_("Unavailable while auto-focus is running"))
+        self._activity_started(Activity.AUTOFOCUS)
+
+    def _on_autofocus_ended(self, _succeeded: bool) -> None:
+        self._activity_ended(Activity.AUTOFOCUS)
+        self.camera_panel.set_locked(False)
+        self.change_mode_btn.setEnabled(True)
+        self.change_mode_btn.setToolTip(self._change_mode_tooltip)
+
+    # ---------------------------------------------------- Status badges --
+    def _activity_started(self, activity: Activity, detail: str = "") -> None:
+        """Show `activity`'s badge; the shared blink timer runs while any is shown."""
+        self.activity.start(activity, detail)
+        if not self.badge_blink_timer.isActive():
+            self.badge_blink_timer.start(BADGE_BLINK_INTERVAL_MS)
+
+    def _activity_ended(self, activity: Activity) -> None:
+        self.activity.stop(activity)
+        if not self.activity.any_active:
+            self.badge_blink_timer.stop()
 
     # ----------------------------------------------------- Back to start --
     def _change_mode(self) -> None:
@@ -354,15 +379,13 @@ class MainWindow(QMainWindow):
             self.video_writer = cv2.VideoWriter(str(path), fourcc, 20.0, (w, h))
             logger.info("Recording started: %s (%dx%d)", path, w, h)
             self.capture_panel.set_recording(True)
-            self._recording_blink_on = True
-            self.recording_blink_timer.start(RECORDING_BLINK_INTERVAL_MS)
+            self._activity_started(Activity.RECORDING)
             self.status.showMessage(_("Recording to {path}").format(path=path))
         else:
             self.video_writer.release()
             self.video_writer = None
             logger.info("Recording stopped")
-            self.recording_blink_timer.stop()
-            self._recording_blink_on = False
+            self._activity_ended(Activity.RECORDING)
             self.capture_panel.set_recording(False)
             self.status.showMessage(_("Recording stopped"))
 
@@ -400,8 +423,8 @@ class MainWindow(QMainWindow):
     # ------------------------------------------------------------- Cleanup --
     def closeEvent(self, event) -> None:
         self._stop_stream()
-        if hasattr(self, "recording_blink_timer"):
-            self.recording_blink_timer.stop()
+        if hasattr(self, "badge_blink_timer"):
+            self.badge_blink_timer.stop()
         if self.stage_module is not None:
             self.stage_module.shutdown()
         if self._log_viewer is not None:

@@ -383,7 +383,21 @@ in real-world distance on every different piece of hardware.
   sweep whose winner sits at the very edge of the window it searched,
   meaning the true peak may lie further out in that direction.
 
-### `core/overlays.py` - preview-overlay drawing (grid + scale bar)
+### `core/activity.py` - which activities show a preview badge
+
+Pure state, no Qt. **`Activity`** is an enum of the long-running things the
+preview can flag, each with its label and colour (`RECORDING` = red `REC`,
+`AUTOFOCUS` = amber `AUTOFOCUS <phase> <step>/<total>`); declaration order is the
+top-to-bottom order. **`ActivityTracker`** holds the running set, an optional
+detail text per activity and the shared blink phase, and `badges()` returns what
+to draw. Recording while autofocusing is the normal case: both rows are shown,
+in fixed order, so neither moves when the other starts or stops. Only the *dot*
+blinks (the text stays put). Adding another activity (homing, calibration...)
+means adding one `Activity` member and calling `_activity_started()` /
+`_activity_ended()` from the window. The badges are preview-only: they are never
+written into recordings or snapshots.
+
+### `core/overlays.py` - preview-overlay drawing (grid, scale bar, status badges)
 
 Pure input-frame-in/output-frame-out functions, same style as
 `core/autofocus.py` - no Qt, no hardware, just `cv2`/`numpy` array
@@ -396,6 +410,11 @@ if the caller supplies a calibrated `um_per_pixel` value; there's no way
 to derive real-world size from pixel counts alone, so the automatic
 default is honest about what it can and can't know.
 
+- **`Badge(label, color, dot_visible)`** / **`draw_status_badges(frame, badges)`**
+  - a column of status indicators (coloured dot + ASCII label) at the top-left
+  of the preview. Every badge gets its own fixed-height row
+  (`badge_row_origins(count)`, pure geometry), so any number of them can be
+  shown together without overlapping.
 - **`grid_line_positions(size_px, spacing_px) -> List[int]`** - the 1-D
   line positions for one axis of the alignment grid; pure geometry,
   separated from the actual `cv2.line()` calls so it can be tested alone.
@@ -545,7 +564,13 @@ backends, instead of each reimplementing the same bookkeeping.
   on an edge-hit or a weak-signal result) followed by one fine pass,
   reporting progress and a final result message via signals. If the stage
   stops answering it emits `stage_failed` (handled like a failed jog) before
-  the final message.
+  the final message. `finished_focus(succeeded, message)` carries the outcome,
+  and `progress(phase, step, total)` the position inside the running sweep.
+  The thread writes the autofocus log events (English, whatever the interface
+  language): `Autofocus started`, `Autofocus in progress: <phase> sweep N, M
+  positions` (once per sweep, not per sample), `Autofocus completed (...)` and
+  `Autofocus failed: ...` (ERROR level). A request that is refused up front
+  (no camera stream) logs `Autofocus not started: ...` as a warning.
 - **`_run_one_sweep(plan)`** —> executes one sweep (coarse or fine): moves
   to the start of the window, samples+scores a frame at each position,
   returns to the best-scoring one.
@@ -618,9 +643,17 @@ contain camera/stage/autofocus *logic* itself. Notable methods:
 - **`_on_frame(frame, fps)`** -> receives frames from `CameraThread`. Calls
   `_draw_overlays()` for whatever should be baked into the saved video
   (scale bar, timestamp) *before* writing to `VideoWriter`, then applies`
-  preview-only extras, the alignment grid and the blinking "REC"
-  indicator, to a separate copy used only for the on-screen `VideoView`,
-  so neither ends up in the saved file.
+  preview-only extras, the alignment grid and the status badges
+  (`REC`, `AUTOFOCUS`; see `core/activity.py`), to a separate copy used only
+  for the on-screen `VideoView`, so none of them ends up in the saved file.
+- **`_activity_started(activity)` / `_activity_ended(activity)`** -> turn a
+  badge on or off and run the shared blink timer only while one is showing.
+  Recording calls them directly; autofocus reaches them through the
+  `StageModule.autofocus_started` / `autofocus_progress` / `autofocus_ended`
+  signals, so the window never touches the autofocus thread. While a sweep runs the window also locks the
+  camera panel (`CameraPanel.set_locked()`) and the **Change mode / language...**
+  button, so the stream cannot be stopped or reconfigured and the session cannot be left
+  under it; it unlocks on `autofocus_ended`, success or failure.
 - **`_draw_overlays(frame)`** -> overlays that *are* meant to be part of
   the saved data: the scale bar (via `core/overlays.py::draw_scale_bar`,
   passed `DisplayPanel.um_per_pixel_override` - `None` unless the user
@@ -632,7 +665,8 @@ contain camera/stage/autofocus *logic* itself. Notable methods:
   box ("Camera not detected" / "Camera disconnected"), not in a modal.
 - **`StageModule._on_jog_requested(direction)`** -> calls `plan_jog()`, then
   queues the move on `StageMovementThread`; `_run_autofocus()` constructs and
-  starts an `AutoFocusThread`; `_on_autofocus_finished(message)` cleans the
+  starts an `AutoFocusThread` (and emits `autofocus_started`);
+  `_on_autofocus_finished(succeeded, message)` emits `autofocus_ended` and cleans the
   thread up safely (see
   [threading model](#threading-model-background-work-never-blocks-the-ui)).
 - **`closeEvent()`** —> stops all threads and disconnects hardware before
