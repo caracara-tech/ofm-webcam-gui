@@ -3,13 +3,15 @@
 from __future__ import annotations
 
 from PyQt5.QtCore import pyqtSignal
-from PyQt5.QtWidgets import (
-    QCheckBox, QGridLayout, QGroupBox, QHBoxLayout, QLabel, QPushButton, QSpinBox, QVBoxLayout, QWidget,
-)
+from PyQt5.QtWidgets import QCheckBox, QGridLayout, QHBoxLayout, QLabel, QPushButton, QSpinBox, QVBoxLayout, QWidget
 
 from core.device_status import DeviceState, DeviceStatus
+from core.help_topics import HelpTopic
 from core.i18n import _, pgettext
-from core.types import Direction, Position, StageMotionSettings
+from core.types import Axis, Direction, Position, StageMotionSettings
+from ui.widgets.help import HelpGroupBox, add_help, reserve_help_column, set_tip
+
+_HELP_COLUMN = 4  # the controls use columns 0-3; this one is reserved for the "?" marks
 
 # (direction, grid row, grid column) of each jog button.
 _DIRECTION_LAYOUT = [
@@ -57,7 +59,7 @@ def _connect_button_text(status: DeviceStatus) -> str:
     return _("Retry connection")
 
 
-class StagePanel(QGroupBox):
+class StagePanel(HelpGroupBox):
     """Emits `jog_requested(Direction)` on button press and
     `settings_changed(StageMotionSettings)` whenever the user edits a spinbox.
 
@@ -75,6 +77,7 @@ class StagePanel(QGroupBox):
 
     def __init__(self, initial_settings: StageMotionSettings, parent=None):
         super().__init__(_("Stage Control"), parent)
+        self.set_help(HelpTopic.STAGE_SECTION)
         self.settings = initial_settings
         outer = QVBoxLayout(self)
 
@@ -85,44 +88,57 @@ class StagePanel(QGroupBox):
         outer.addWidget(self.connect_btn)
         self.connect_btn.hide()
 
-        # Everything else lives in one container so it can be enabled or
-        # disabled as a unit without touching the status area.
+        # Everything else lives in one container, apart from the connect button above.
+        # The controls are enabled one by one (see `_apply_enabled`), never by disabling
+        # the container, so the "?" help buttons keep working while the stage is unusable.
         self._controls = QWidget()
         outer.addWidget(self._controls)
         layout = QGridLayout(self._controls)
         layout.setContentsMargins(0, 0, 0, 0)
+        reserve_help_column(layout, _HELP_COLUMN)
 
+        self._stage_ready = False  # connected: the settings controls are usable
+        self._jog_allowed = True   # no movement in flight: the jog and autofocus buttons are usable
         self._direction_buttons: list[QPushButton] = []
         for direction, row, col in _DIRECTION_LAYOUT:
             btn = QPushButton(direction_label(direction))
             # No pixel cap: the buttons share the column width evenly, so they
             # look right at any DPI/font size instead of at one screen's.
+            set_tip(btn, HelpTopic.STAGE_JOG_Z if direction.axis is Axis.Z else HelpTopic.STAGE_JOG_XY)
             btn.clicked.connect(lambda checked=False, d=direction: self.jog_requested.emit(d))
             layout.addWidget(btn, row, col)
             self._direction_buttons.append(btn)
 
-        layout.addWidget(QLabel(_("XY Step (\u00b5m):")), 2, 0, 1, 2)
         self.xy_step_spin = QSpinBox()
         self.xy_step_spin.setRange(1, 1000)
         self.xy_step_spin.setValue(int(self.settings.xy_step_um))
         self.xy_step_spin.valueChanged.connect(self._emit_settings)
+        xy_label = QLabel(_("XY Step (\u00b5m):"))
+        layout.addWidget(xy_label, 2, 0, 1, 2)
         layout.addWidget(self.xy_step_spin, 2, 2, 1, 2)
+        add_help(layout, 2, HelpTopic.STAGE_XY_STEP, column=_HELP_COLUMN, tips=(xy_label, self.xy_step_spin))
 
-        layout.addWidget(QLabel(_("Z Step (\u00b5m):")), 3, 0, 1, 2)
         self.z_step_spin = QSpinBox()
         self.z_step_spin.setRange(1, 1000)
         self.z_step_spin.setValue(int(self.settings.z_step_um))
         self.z_step_spin.valueChanged.connect(self._emit_settings)
+        z_label = QLabel(_("Z Step (\u00b5m):"))
+        layout.addWidget(z_label, 3, 0, 1, 2)
         layout.addWidget(self.z_step_spin, 3, 2, 1, 2)
+        add_help(layout, 3, HelpTopic.STAGE_Z_STEP, column=_HELP_COLUMN, tips=(z_label, self.z_step_spin))
 
-        layout.addWidget(QLabel(_("Speed (\u00b5m/s):")), 4, 0, 1, 2)
         self.speed_spin = QSpinBox()
         self.speed_spin.setRange(1, 1000)
         self.speed_spin.setValue(int(self.settings.speed_um_per_s))
         self.speed_spin.valueChanged.connect(self._emit_settings)
+        speed_label = QLabel(_("Speed (\u00b5m/s):"))
+        layout.addWidget(speed_label, 4, 0, 1, 2)
         layout.addWidget(self.speed_spin, 4, 2, 1, 2)
+        add_help(layout, 4, HelpTopic.STAGE_SPEED, column=_HELP_COLUMN, tips=(speed_label, self.speed_spin))
 
-        layout.addWidget(QLabel(_("Position (\u00b5m):")), 5, 0, 1, 2)
+        position_label = QLabel(_("Position (\u00b5m):"))
+        set_tip(position_label, HelpTopic.STAGE_POSITION)
+        layout.addWidget(position_label, 5, 0, 1, 2)
         pos_layout = QHBoxLayout()
         self.pos_x_label = QLabel("X: 0.00")
         self.pos_y_label = QLabel("Y: 0.00")
@@ -130,19 +146,22 @@ class StagePanel(QGroupBox):
         pos_layout.addWidget(self.pos_x_label)
         pos_layout.addWidget(self.pos_y_label)
         pos_layout.addWidget(self.pos_z_label)
+        for label in (self.pos_x_label, self.pos_y_label, self.pos_z_label):
+            set_tip(label, HelpTopic.STAGE_POSITION)
         layout.addLayout(pos_layout, 6, 0, 1, 4)
 
         self.autofocus_btn = QPushButton(_("Run Auto-Focus (Z sweep)"))
         self.autofocus_btn.clicked.connect(self.autofocus_requested.emit)
         layout.addWidget(self.autofocus_btn, 7, 0, 1, 4)
+        add_help(layout, 7, HelpTopic.STAGE_AUTOFOCUS, column=_HELP_COLUMN, tips=(self.autofocus_btn,))
 
         self.autofocus_after_jog_check = QCheckBox(_("Auto-focus after each XY move"))
-        self.autofocus_after_jog_check.setToolTip(
-            _("Automatically re-runs the Z-sweep autofocus after every X/Y jog.")
-        )
         self.autofocus_after_jog_check.setChecked(self.settings.autofocus_after_xy_jog)
         self.autofocus_after_jog_check.toggled.connect(self._emit_settings)
         layout.addWidget(self.autofocus_after_jog_check, 8, 0, 1, 4)
+        add_help(
+            layout, 8, HelpTopic.STAGE_AUTOFOCUS_AFTER_JOG, column=_HELP_COLUMN, tips=(self.autofocus_after_jog_check,),
+        )
 
     def _emit_settings(self, *_args) -> None:
         self.settings = StageMotionSettings(
@@ -169,12 +188,19 @@ class StagePanel(QGroupBox):
         self.set_enabled_all(status.is_ok)
 
     def set_enabled_all(self, enabled: bool) -> None:
-        self._controls.setEnabled(enabled)
+        self._stage_ready = enabled
+        self._apply_enabled()
 
     def set_jog_enabled(self, enabled: bool) -> None:
         """Enable/disable just the direction and autofocus buttons - used to
         block new movement requests while one is already in flight, without
         touching the step/speed spinboxes or position labels."""
-        for btn in self._direction_buttons:
-            btn.setEnabled(enabled)
-        self.autofocus_btn.setEnabled(enabled)
+        self._jog_allowed = enabled
+        self._apply_enabled()
+
+    def _apply_enabled(self) -> None:
+        """Settings need a connected stage; the movement buttons also need no move in flight."""
+        for control in (self.xy_step_spin, self.z_step_spin, self.speed_spin, self.autofocus_after_jog_check):
+            control.setEnabled(self._stage_ready)
+        for btn in (*self._direction_buttons, self.autofocus_btn):
+            btn.setEnabled(self._stage_ready and self._jog_allowed)

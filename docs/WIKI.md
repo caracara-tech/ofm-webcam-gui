@@ -578,6 +578,40 @@ backends, instead of each reimplementing the same bookkeeping.
   captured *after* the most recent move finished (using a frame counter),
   rather than blindly sleeping and risking a stale, pre-move frame.
 
+### `core/help_topics.py`, `ui/widgets/help.py` - tooltips and "?" help
+
+One mechanism for every explanation in the interface.
+
+- **`core/help_topics.py`** (pure, no Qt) - `HelpTopic` is an enum with one member per
+  documented control; `help_entry(topic)` returns its `HelpEntry`: a one-sentence
+  `summary` (the control's own tooltip) and, for topics that get a "?" mark, a
+  `title` and `details`. Texts are built on demand so they follow the active
+  language, and numbers that live in code (the autofocus sweep sizes) are read
+  from `AutoFocusSettings` instead of being typed a second time.
+- **`ui/widgets/help.py`** - the Qt side, which never knows what a text says:
+  - `set_tip(widget, topic)` -> the standard tooltip (rich text, so it wraps).
+  - `add_help(layout, row, topic, column=N, tips=(...))` -> a small "?"
+    (`HelpIndicator`, the plain character in a circle, in the text colour) in
+    the grid's help column. Hover = the full text as a tooltip; that is all it
+    does, there is no click action. It is a separate widget placed *beside* the
+    control, so it keeps working while the control is disabled.
+  - `reserve_help_column(layout, N)` -> every section keeps one narrow column at
+    its right edge for the "?" marks, in rows with or without one. Controls never
+    span into it, so the marks line up in a single column and all controls end at
+    the same place. Convention: each panel defines `_HELP_COLUMN` = the first
+    column after its controls. Width = one "?" in the current font (no pixel constants).
+  - `HelpGroupBox` -> a `QGroupBox` with `set_help(topic)`: a "?" at the right
+    end of the title row, placed above that same column (it uses the layout's
+    right margin) and floating over the frame, so it adds no layout row.
+- **Adding help to a control:** add a `HelpTopic` member, add its entry to `_ENTRIES`,
+  then call `set_tip()` (obvious controls: tooltip only) or `add_help()` (controls
+  that need explaining). Every control should have at least a tooltip. Then run
+  `python tools/i18n.py update`, translate the new strings and `compile`.
+- **Locking and help:** panels that lock controls (`CameraPanel.set_locked()`,
+  `StagePanel`) disable the controls one by one, never the whole panel, so the
+  "?" buttons stay usable. The reason a control is locked is its tooltip
+  (`HelpTopic.LOCKED_DURING_AUTOFOCUS`).
+
 ### `ui/panels/*.py` - self-contained UI widgets
 
 - **`CameraPanel`** —> camera dropdown (by name, with a refresh button),

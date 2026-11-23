@@ -62,6 +62,340 @@ msgstr ""
 "No requiere hardware: interfaz completa con una plataforma simulada (no se mueve nada "
 "físicamente)."
 
+#: core/help_topics.py
+#, python-brace-format
+msgid ""
+"Moves Z up and down around the current position and scores the sharpness of the centre of the "
+"image at each stop. It first searches ±{coarse_range_um:g} µm in {coarse_step_um:g} µm steps, "
+"widening the search (up to {max_coarse_passes} times) while the sharpest point is at the edge of "
+"the range, then refines it with ±{fine_range_um:g} µm in {fine_step_um:g} µm steps.\n"
+"Needs the camera stream running and a sample with visible detail. While it runs, an AUTOFOCUS "
+"badge is shown on the preview, the camera controls are locked and the progress is written to the "
+"log."
+msgstr ""
+"Mueve Z hacia arriba y abajo alrededor de la posición actual y puntúa la nitidez del centro de la"
+" imagen en cada parada. Primero busca ±{coarse_range_um:g} µm en pasos de {coarse_step_um:g} µm, "
+"ampliando la búsqueda (hasta {max_coarse_passes} veces) mientras el punto más nítido esté en el "
+"borde del rango, y luego lo afina con ±{fine_range_um:g} µm en pasos de {fine_step_um:g} µm.\n"
+"Requiere la transmisión de la cámara en marcha y una muestra con detalles visibles. Mientras se "
+"ejecuta, se muestra un indicador AUTOFOCUS en la vista previa, los controles de la cámara se "
+"bloquean y el progreso se escribe en el registro."
+
+#: core/help_topics.py
+msgid "Choose the camera and how it is read, then start the live preview."
+msgstr "Elige la cámara y cómo se lee, y luego inicia la vista previa en vivo."
+
+#: core/help_topics.py ui/panels/camera_panel.py
+msgid "Camera"
+msgstr "Cámara"
+
+#: core/help_topics.py
+msgid ""
+"The device, backend and resolution are read when the stream starts: to change them, stop the "
+"stream and start it again."
+msgstr ""
+"El dispositivo, el backend y la resolución se leen al iniciar la transmisión: para cambiarlos, "
+"detén la transmisión y vuelve a iniciarla."
+
+#: core/help_topics.py
+msgid "Which connected camera to use. Press the refresh button after plugging one in."
+msgstr "Qué cámara conectada usar. Pulsa el botón de actualizar después de conectar una."
+
+#: core/help_topics.py
+msgid "Refresh camera list"
+msgstr "Actualizar lista de cámaras"
+
+#: core/help_topics.py
+msgid "The system interface used to talk to the camera."
+msgstr "La interfaz del sistema que se usa para comunicarse con la cámara."
+
+#: core/help_topics.py
+msgid "Camera backend"
+msgstr "Backend de la cámara"
+
+#: core/help_topics.py
+msgid ""
+"Windows offers Media Foundation (MSMF, the default) and DirectShow (DSHOW, a fallback); Linux "
+"uses V4L2; macOS uses AVFoundation.\n"
+"If a camera does not open or the picture looks wrong, try the other backend."
+msgstr ""
+"Windows ofrece Media Foundation (MSMF, el predeterminado) y DirectShow (DSHOW, de respaldo); "
+"Linux usa V4L2; macOS usa AVFoundation.\n"
+"Si una cámara no se abre o la imagen se ve mal, prueba el otro backend."
+
+#: core/help_topics.py
+msgid "The frame size requested from the camera."
+msgstr "El tamaño de fotograma que se solicita a la cámara."
+
+#: core/help_topics.py
+msgid "Resolution"
+msgstr "Resolución"
+
+#: core/help_topics.py
+msgid ""
+"If the camera cannot provide it, the driver picks a nearby size. Lower resolutions give a higher "
+"frame rate and smaller files. Snapshots and recordings use the size of the frames actually "
+"received."
+msgstr ""
+"Si la cámara no puede ofrecerlo, el controlador elige un tamaño cercano. Las resoluciones menores"
+" dan más fotogramas por segundo y archivos más pequeños. Las capturas y grabaciones usan el "
+"tamaño de los fotogramas realmente recibidos."
+
+#: core/help_topics.py
+msgid ""
+"Start or stop the live preview from the selected camera. Stopping also ends a recording in "
+"progress."
+msgstr ""
+"Inicia o detiene la vista previa en vivo de la cámara seleccionada. Al detenerla también termina "
+"una grabación en curso."
+
+#: core/help_topics.py
+msgid "Save still images or video of the live preview."
+msgstr "Guarda imágenes fijas o video de la vista previa en vivo."
+
+#: core/help_topics.py ui/panels/capture_panel.py
+msgid "Snapshots & Recording"
+msgstr "Capturas y grabación"
+
+#: core/help_topics.py
+msgid ""
+"Files go to the output folder. Snapshots are named frame_YYYYMMDD_HHMMSS_mmm.png and recordings "
+"recording_YYYYMMDD_HHMMSS.mp4."
+msgstr ""
+"Los archivos van a la carpeta de salida. Las capturas se llaman frame_AAAAMMDD_HHMMSS_mmm.png y "
+"las grabaciones recording_AAAAMMDD_HHMMSS.mp4."
+
+#: core/help_topics.py
+msgid "The folder where snapshots and recordings are saved."
+msgstr "La carpeta donde se guardan las capturas y grabaciones."
+
+#: core/help_topics.py
+msgid "Choose another output folder."
+msgstr "Elegir otra carpeta de salida."
+
+#: core/help_topics.py
+msgid "Open this folder in the file manager"
+msgstr "Abrir esta carpeta en el administrador de archivos"
+
+#: core/help_topics.py
+msgid "Save the current frame as a PNG image. The scale bar and timestamp are included if enabled."
+msgstr ""
+"Guarda el fotograma actual como imagen PNG. Se incluyen la barra de escala y la marca de tiempo "
+"si están activadas."
+
+#: core/help_topics.py
+msgid "Record the live preview to an .mp4 video file."
+msgstr "Graba la vista previa en vivo en un archivo de video .mp4."
+
+#: core/help_topics.py
+msgid "Recording"
+msgstr "Grabación"
+
+#: core/help_topics.py
+msgid ""
+"The video is written at a fixed 20 frames per second. The scale bar and timestamp are included if"
+" enabled; the grid and the REC / AUTOFOCUS badges are not.\n"
+"You can keep recording while auto-focus runs. Stopping the stream also stops the recording."
+msgstr ""
+"El video se escribe a 20 fotogramas por segundo fijos. Se incluyen la barra de escala y la marca "
+"de tiempo si están activadas; la cuadrícula y los indicadores REC / AUTOFOCUS no.\n"
+"Puedes seguir grabando mientras se ejecuta el enfoque automático. Al detener la transmisión "
+"también se detiene la grabación."
+
+#: core/help_topics.py
+msgid "Print the date and time on every frame."
+msgstr "Escribe la fecha y la hora en cada fotograma."
+
+#: core/help_topics.py
+msgid "Timestamp"
+msgstr "Marca de tiempo"
+
+#: core/help_topics.py
+msgid "It is drawn on the preview, on snapshots and on recordings. Turn it off for clean images."
+msgstr ""
+"Se dibuja en la vista previa, en las capturas y en las grabaciones. Desactívala para obtener "
+"imágenes limpias."
+
+#: core/help_topics.py
+msgid "Move the microscope stage and focus."
+msgstr "Mueve la plataforma del microscopio y enfoca."
+
+#: core/help_topics.py ui/panels/stage_panel.py
+msgid "Stage Control"
+msgstr "Control de plataforma"
+
+#: core/help_topics.py
+msgid ""
+"L and R move along X, U and D along Y, W and S along Z (focus). Distances are in micrometres (µm)"
+" and are converted to motor steps with the stage calibration.\n"
+"The position shown is counted by the program from where it started; the stage has no position "
+"sensors, so it can drift if the motors skip steps."
+msgstr ""
+"L y R mueven en X, U y D en Y, W y S en Z (enfoque). Las distancias están en micrómetros (µm) y "
+"se convierten a pasos de motor con la calibración de la plataforma.\n"
+"La posición mostrada la cuenta el programa desde donde se inició; la plataforma no tiene sensores"
+" de posición, así que puede desviarse si los motores pierden pasos."
+
+#: core/help_topics.py
+msgid "Move one XY step: L and R along X, U and D along Y."
+msgstr "Mueve un paso XY: L y R en X, U y D en Y."
+
+#: core/help_topics.py
+msgid "Move one Z step to change focus: W and S move in the + and - direction."
+msgstr "Mueve un paso Z para cambiar el enfoque: W y S se mueven en sentido + y -."
+
+#: core/help_topics.py
+msgid "Distance moved by each X/Y button press."
+msgstr "Distancia que se mueve con cada pulsación de un botón X/Y."
+
+#: core/help_topics.py
+msgid "XY step"
+msgstr "Paso XY"
+
+#: core/help_topics.py
+msgid "In micrometres (µm), converted to motor steps with the stage calibration."
+msgstr "En micrómetros (µm), convertida a pasos de motor con la calibración de la plataforma."
+
+#: core/help_topics.py
+msgid "Distance moved by each Z button press."
+msgstr "Distancia que se mueve con cada pulsación de un botón Z."
+
+#: core/help_topics.py
+msgid "Z step"
+msgstr "Paso Z"
+
+#: core/help_topics.py
+msgid "Smaller steps give finer focus control; use auto-focus for large changes."
+msgstr ""
+"Los pasos pequeños dan un control de enfoque más fino; usa el enfoque automático para cambios "
+"grandes."
+
+#: core/help_topics.py
+msgid "How fast the stage moves, in µm per second."
+msgstr "Qué tan rápido se mueve la plataforma, en µm por segundo."
+
+#: core/help_topics.py
+msgid "Speed"
+msgstr "Velocidad"
+
+#: core/help_topics.py
+msgid ""
+"The controller has a maximum step rate, so very high speeds are capped. Lower speeds are gentler "
+"and help avoid skipped steps."
+msgstr ""
+"El controlador tiene una tasa máxima de pasos, por lo que las velocidades muy altas se limitan. "
+"Las velocidades bajas son más suaves y ayudan a evitar pasos perdidos."
+
+#: core/help_topics.py
+msgid "Stage position in µm, counted from where the program started."
+msgstr "Posición de la plataforma en µm, contada desde donde se inició el programa."
+
+#: core/help_topics.py
+msgid "Find the sharpest focus by sweeping the Z axis."
+msgstr "Encuentra el enfoque más nítido haciendo un barrido del eje Z."
+
+#: core/help_topics.py
+msgid "Auto-focus"
+msgstr "Enfoque automático"
+
+#: core/help_topics.py
+msgid "Automatically re-runs the Z-sweep autofocus after every X/Y jog."
+msgstr ""
+"Vuelve a ejecutar automáticamente el barrido de enfoque automático en Z después de cada "
+"desplazamiento en X/Y."
+
+#: core/help_topics.py ui/panels/stage_panel.py
+msgid "Auto-focus after each XY move"
+msgstr "Autoenfoque tras cada mov. XY"
+
+#: core/help_topics.py
+msgid "Keeps the sample in focus while exploring, at the cost of waiting for a sweep after every move."
+msgstr ""
+"Mantiene la muestra enfocada mientras exploras, a costa de esperar un barrido después de cada "
+"movimiento."
+
+#: core/help_topics.py
+msgid "Aids drawn over the live preview."
+msgstr "Ayudas dibujadas sobre la vista previa en vivo."
+
+#: core/help_topics.py ui/panels/display_panel.py
+msgid "Display"
+msgstr "Visualización"
+
+#: core/help_topics.py
+msgid "The grid is only shown on screen. The scale bar is also saved in snapshots and recordings."
+msgstr ""
+"La cuadrícula solo se muestra en pantalla. La barra de escala también se guarda en las capturas y"
+" grabaciones."
+
+#: core/help_topics.py
+msgid "Draw an alignment grid over the preview; the spacing is in image pixels. It is never saved."
+msgstr ""
+"Dibuja una cuadrícula de alineación sobre la vista previa; el espaciado es en píxeles de la "
+"imagen. Nunca se guarda."
+
+#: core/help_topics.py
+msgid "Draw a scale bar over the image. It reads in pixels unless a physical calibration is set."
+msgstr ""
+"Dibuja una barra de escala sobre la imagen. Se expresa en píxeles salvo que se defina una "
+"calibración física."
+
+#: core/help_topics.py
+msgid "Choose white or black, whichever reads better on your sample."
+msgstr "Elige blanco o negro, el que se lea mejor sobre tu muestra."
+
+#: core/help_topics.py
+msgid "Show or hide the physical calibration option."
+msgstr "Muestra u oculta la opción de calibración física."
+
+#: core/help_topics.py
+msgid "Show the scale bar in micrometres instead of pixels."
+msgstr "Muestra la barra de escala en micrómetros en lugar de píxeles."
+
+#: core/help_topics.py
+msgid "Physical calibration"
+msgstr "Calibración física"
+
+#: core/help_topics.py
+msgid ""
+"Pixels alone say nothing about real size: you need a reference. Image a stage micrometer (a slide"
+" with a ruler), measure how many pixels a known distance covers and enter the µm per pixel.\n"
+"The value only holds for this objective and camera resolution: change either and measure again."
+msgstr ""
+"Los píxeles por sí solos no dicen nada del tamaño real: se necesita una referencia. Fotografía un"
+" micrómetro de platina (un portaobjetos con una regla), mide cuántos píxeles abarca una distancia"
+" conocida e ingresa los µm por píxel.\n"
+"El valor solo vale para este objetivo y esta resolución de cámara: si cambias alguno, vuelve a "
+"medir."
+
+#: core/help_topics.py
+msgid "Write everything logged in this session to a file, starting from the beginning of the session"
+msgstr "Escribe en un archivo todo lo registrado en esta sesión, desde el inicio de la sesión"
+
+#: core/help_topics.py
+msgid "Show the log of this session in a window"
+msgstr "Mostrar el registro de esta sesión en una ventana"
+
+#: core/help_topics.py
+msgid "Write the whole session log (all levels) to a file of your choice"
+msgstr "Escribir el registro completo de la sesión (todos los niveles) en un archivo a su elección"
+
+#: core/help_topics.py
+msgid "Open the log folder in the file manager"
+msgstr "Abrir la carpeta de registros en el administrador de archivos"
+
+#: core/help_topics.py
+msgid "Return to the start screen to pick another mode or language"
+msgstr "Volver a la pantalla de inicio para elegir otro modo o idioma"
+
+#: core/help_topics.py
+msgid "About this program and its license"
+msgstr "Acerca de este programa y su licencia"
+
+#: core/help_topics.py
+msgid "Unavailable while auto-focus is running"
+msgstr "No disponible mientras se ejecuta el enfoque automático"
+
 #. Name of THIS language, written in that language, shown in the language selector (e.g. "Español
 #. (Latinoamérica)"). Do not translate literally.
 #: core/i18n.py
@@ -148,10 +482,6 @@ msgid "Change mode / language..."
 msgstr "Cambiar modo / idioma..."
 
 #: ui/main_window.py
-msgid "Return to the start screen to pick another mode or language"
-msgstr "Volver a la pantalla de inicio para elegir otro modo o idioma"
-
-#: ui/main_window.py
 msgid "SIMULATION MODE"
 msgstr "MODO SIMULACIÓN"
 
@@ -162,10 +492,6 @@ msgstr "MODO MANUAL"
 #: ui/dialogs/about.py ui/main_window.py
 msgid "About / License"
 msgstr "Acerca de / Licencia"
-
-#: ui/main_window.py
-msgid "About this program and its license"
-msgstr "Acerca de este programa y su licencia"
 
 #: ui/main_window.py
 msgid "Streaming..."
@@ -372,17 +698,9 @@ msgstr "Solo errores"
 msgid "Save a copy..."
 msgstr "Guardar una copia..."
 
-#: ui/dialogs/log_viewer.py
-msgid "Write the whole session log (all levels) to a file of your choice"
-msgstr "Escribir el registro completo de la sesión (todos los niveles) en un archivo a su elección"
-
 #: ui/dialogs/log_viewer.py ui/panels/capture_panel.py
 msgid "Open folder"
 msgstr "Abrir carpeta"
-
-#: ui/dialogs/log_viewer.py
-msgid "Open the log folder in the file manager"
-msgstr "Abrir la carpeta de registros en el administrador de archivos"
 
 #: ui/dialogs/log_viewer.py
 msgid "Save a copy of the log"
@@ -393,16 +711,8 @@ msgid "Log files (*.log *.txt)"
 msgstr "Archivos de registro (*.log *.txt)"
 
 #: ui/panels/camera_panel.py
-msgid "Camera"
-msgstr "Cámara"
-
-#: ui/panels/camera_panel.py
 msgid "Device:"
 msgstr "Dispositivo:"
-
-#: ui/panels/camera_panel.py
-msgid "Refresh camera list"
-msgstr "Actualizar lista de cámaras"
 
 #: ui/panels/camera_panel.py
 msgid "Backend:"
@@ -420,14 +730,6 @@ msgstr "Iniciar transmisión"
 msgid "Stop Stream"
 msgstr "Detener transmisión"
 
-#: ui/panels/camera_panel.py
-msgid "Unavailable while auto-focus is running"
-msgstr "No disponible mientras se ejecuta el enfoque automático"
-
-#: ui/panels/capture_panel.py
-msgid "Snapshots & Recording"
-msgstr "Capturas y grabación"
-
 #: ui/panels/capture_panel.py
 msgid "Output folder:"
 msgstr "Carpeta de salida:"
@@ -435,10 +737,6 @@ msgstr "Carpeta de salida:"
 #: ui/panels/capture_panel.py
 msgid "Browse"
 msgstr "Examinar"
-
-#: ui/panels/capture_panel.py
-msgid "Open this folder in the file manager"
-msgstr "Abrir esta carpeta en el administrador de archivos"
 
 #: ui/panels/capture_panel.py
 msgid "Save Snapshot (PNG)"
@@ -457,10 +755,6 @@ msgid "Stop Recording"
 msgstr "Detener grabación"
 
 #: ui/panels/display_panel.py
-msgid "Display"
-msgstr "Visualización"
-
-#: ui/panels/display_panel.py
 msgid "Show grid"
 msgstr "Mostrar cuadrícula"
 
@@ -475,10 +769,6 @@ msgstr "Blanco"
 #: ui/panels/display_panel.py
 msgid "Black"
 msgstr "Negro"
-
-#: ui/panels/display_panel.py
-msgid "Scale bar color"
-msgstr "Color de la barra de escala"
 
 #: ui/panels/display_panel.py
 msgid ""
@@ -496,29 +786,13 @@ msgstr "Avanzado"
 msgid "Override with physical calibration"
 msgstr "Usar calibración física"
 
-#: ui/panels/display_panel.py
-msgid ""
-"Only turn this on if you've measured a real um/pixel value (e.g. by imaging a stage micrometer) "
-"and want the scale bar in physical units instead of pixels."
-msgstr ""
-"Actívelo solo si midió un valor real de um/píxel (p. ej., al fotografiar un micrómetro de "
-"plataforma) y desea que la barra de escala se muestre en unidades físicas en lugar de píxeles."
-
 #: ui/panels/log_panel.py
 msgid "Save log to file"
 msgstr "Guardar registro en archivo"
 
 #: ui/panels/log_panel.py
-msgid "Write everything logged in this session to a file, starting from the beginning of the session"
-msgstr "Escribe en un archivo todo lo registrado en esta sesión, desde el inicio de la sesión"
-
-#: ui/panels/log_panel.py
 msgid "View log..."
 msgstr "Ver registro..."
-
-#: ui/panels/log_panel.py
-msgid "Show the log of this session in a window"
-msgstr "Mostrar el registro de esta sesión en una ventana"
 
 #. Jog button: move the stage up (a short abbreviation, 1-2 letters)
 #: ui/panels/stage_panel.py
@@ -553,10 +827,6 @@ msgid "Retry connection"
 msgstr "Reintentar conexión"
 
 #: ui/panels/stage_panel.py
-msgid "Stage Control"
-msgstr "Control de plataforma"
-
-#: ui/panels/stage_panel.py
 msgid "XY Step (µm):"
 msgstr "Paso XY (µm):"
 
@@ -575,16 +845,6 @@ msgstr "Posición (µm):"
 #: ui/panels/stage_panel.py
 msgid "Run Auto-Focus (Z sweep)"
 msgstr "Enfoque automático (barrido Z)"
-
-#: ui/panels/stage_panel.py
-msgid "Auto-focus after each XY move"
-msgstr "Autoenfoque tras cada mov. XY"
-
-#: ui/panels/stage_panel.py
-msgid "Automatically re-runs the Z-sweep autofocus after every X/Y jog."
-msgstr ""
-"Vuelve a ejecutar automáticamente el barrido de enfoque automático en Z después de cada "
-"desplazamiento en X/Y."
 
 #: ui/panels/stage_panel.py
 msgid "Try to connect to the stage again"
@@ -632,4 +892,9 @@ msgstr "Error inesperado al conectar con la plataforma: {error}"
 #: ui/threads/stage_connect_thread.py
 msgid "The stage did not respond."
 msgstr "La plataforma no respondió."
+
+#: ui/widgets/help.py
+#, python-brace-format
+msgid "Help: {title}"
+msgstr "Ayuda: {title}"
 

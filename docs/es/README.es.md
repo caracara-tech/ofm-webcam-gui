@@ -41,6 +41,7 @@ ofm-webcam-gui/
 │   ├── autofocus.py            #   Cálculos del enfoque automático: planificación del barrido, evaluación del enfoque y convergencia
 │   ├── overlays.py             #   draw_grid() / draw_scale_bar() / draw_status_badges(): dibujo de cuadrículas, barras de escala e indicadores de estado
 │   ├── activity.py             #   Activity / ActivityTracker: qué actividades (REC, AUTOFOCUS...) muestran un indicador en la vista previa
+│   ├── help_topics.py          #   HelpTopic / help_entry(): todos los textos de ayuda (tooltips y botones "?") en un solo lugar
 │   └── scale_calibration.py    #   validate_um_per_pixel(): calibración física opcional para la barra de escala
 ├── hardware/                   # Capa de abstracción del hardware (sin importaciones de PyQt)
 │   ├── abstract.py             #   StageController / CameraController / SensorController ABCs
@@ -58,6 +59,7 @@ ofm-webcam-gui/
 │   ├── stage_module.py         #   StageModule: controlador de la plataforma, conexión en segundo plano, panel, movimiento, enfoque y gestión de "no detectada / perdida"
 │   ├── dialogs/                #   LogViewerDialog (registro de la sesión en vivo), AboutDialog (licencia)
 │   ├── panels/                 #   CameraPanel, CapturePanel, StagePanel, DisplayPanel (widgets QGroupBox), LogBar (controles del registro en la barra de estado)
+│   ├── widgets/                #   help.py (marcas "?" de ayuda alineadas y utilidades de tooltips), VideoView, ScrollColumn
 │   └── threads/                #   CameraThread, StageConnectThread, StageMovementThread, AutoFocusThread (QThread)
 ├── packaging/                  # Configuración de PyInstaller y scripts de compilación (véase BUILDING.md)
 ├── tools/i18n.py               # Herramientas de traducción (véase TRANSLATING.md)

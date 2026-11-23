@@ -5,7 +5,9 @@ from __future__ import annotations
 from PyQt5.QtCore import pyqtSignal
 from PyQt5.QtWidgets import QCheckBox, QHBoxLayout, QPushButton, QWidget
 
+from core.help_topics import HelpTopic
 from core.i18n import _
+from ui.widgets.help import set_tip
 
 
 class LogBar(QWidget):
@@ -23,14 +25,12 @@ class LogBar(QWidget):
         layout.setContentsMargins(0, 0, 0, 0)
 
         self.save_check = QCheckBox(_("Save log to file"))
-        self.save_check.setToolTip(
-            _("Write everything logged in this session to a file, starting from the beginning of the session")
-        )
+        set_tip(self.save_check, HelpTopic.LOG_SAVE)
         self.save_check.toggled.connect(self.save_toggled.emit)
         layout.addWidget(self.save_check)
 
         self.view_btn = QPushButton(_("View log..."))
-        self.view_btn.setToolTip(_("Show the log of this session in a window"))
+        set_tip(self.view_btn, HelpTopic.LOG_VIEW)
         self.view_btn.clicked.connect(self.view_requested.emit)
         layout.addWidget(self.view_btn)
 

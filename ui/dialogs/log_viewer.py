@@ -17,7 +17,9 @@ from PyQt5.QtWidgets import (
     QComboBox, QDialog, QFileDialog, QHBoxLayout, QLabel, QPlainTextEdit, QPushButton, QVBoxLayout, QWidget,
 )
 
+from core.help_topics import HelpTopic
 from core.i18n import _
+from ui.widgets.help import set_tip
 from core.logging_setup import LogEntry, LogHistory
 
 logger = logging.getLogger(__name__)
@@ -73,11 +75,11 @@ class LogViewerDialog(QDialog):
 
         bottom = QHBoxLayout()
         save_btn = QPushButton(_("Save a copy..."))
-        save_btn.setToolTip(_("Write the whole session log (all levels) to a file of your choice"))
+        set_tip(save_btn, HelpTopic.LOG_VIEWER_SAVE)
         save_btn.clicked.connect(self._save_copy)
         bottom.addWidget(save_btn)
         folder_btn = QPushButton(_("Open folder"))
-        folder_btn.setToolTip(_("Open the log folder in the file manager"))
+        set_tip(folder_btn, HelpTopic.LOG_VIEWER_FOLDER)
         folder_btn.clicked.connect(self.open_folder_requested.emit)
         bottom.addWidget(folder_btn)
         bottom.addStretch()

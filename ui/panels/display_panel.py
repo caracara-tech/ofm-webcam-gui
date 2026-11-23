@@ -14,18 +14,20 @@ from __future__ import annotations
 from typing import Optional
 
 from PyQt5.QtCore import Qt, pyqtSignal
-from PyQt5.QtWidgets import (
-    QCheckBox, QComboBox, QDoubleSpinBox, QGridLayout, QGroupBox, QLabel, QSpinBox, QToolButton, QWidget,
-)
+from PyQt5.QtWidgets import QCheckBox, QComboBox, QDoubleSpinBox, QGridLayout, QLabel, QSpinBox, QToolButton, QWidget
 
+from core.help_topics import HelpTopic
 from core.i18n import _
 from core.overlays import ScaleBarColor
+from ui.widgets.help import HelpGroupBox, add_help, reserve_help_column, set_tip
+
+_HELP_COLUMN = 2  # the controls use columns 0-1; this one is reserved for the "?" marks
 
 DEFAULT_GRID_SPACING_PX = 40
 DEFAULT_UM_PER_PIXEL = 1.0
 
 
-class DisplayPanel(QGroupBox):
+class DisplayPanel(HelpGroupBox):
     grid_toggled = pyqtSignal(bool)
     grid_spacing_changed = pyqtSignal(int)
     scale_bar_toggled = pyqtSignal(bool)
@@ -37,22 +39,27 @@ class DisplayPanel(QGroupBox):
 
     def __init__(self, parent=None):
         super().__init__(_("Display"), parent)
+        self.set_help(HelpTopic.DISPLAY_SECTION)
         layout = QGridLayout(self)
+        reserve_help_column(layout, _HELP_COLUMN)
         row = 0
 
         self.grid_check = QCheckBox(_("Show grid"))
+        set_tip(self.grid_check, HelpTopic.DISPLAY_GRID)
         self.grid_check.toggled.connect(self.grid_toggled.emit)
         layout.addWidget(self.grid_check, row, 0)
 
         self.grid_spacing_spin = QSpinBox()
         self.grid_spacing_spin.setRange(10, 500)
         self.grid_spacing_spin.setSuffix(" px")
+        set_tip(self.grid_spacing_spin, HelpTopic.DISPLAY_GRID)
         self.grid_spacing_spin.setValue(DEFAULT_GRID_SPACING_PX)
         self.grid_spacing_spin.valueChanged.connect(self.grid_spacing_changed.emit)
         layout.addWidget(self.grid_spacing_spin, row, 1)
         row += 1
 
         self.scale_bar_check = QCheckBox(_("Show scale bar"))
+        set_tip(self.scale_bar_check, HelpTopic.DISPLAY_SCALE_BAR)
         self.scale_bar_check.toggled.connect(self.scale_bar_toggled.emit)
         layout.addWidget(self.scale_bar_check, row, 0)
 
@@ -60,7 +67,7 @@ class DisplayPanel(QGroupBox):
         self.scale_bar_color_combo = QComboBox()
         self.scale_bar_color_combo.addItem(_("White"), ScaleBarColor.WHITE.value)
         self.scale_bar_color_combo.addItem(_("Black"), ScaleBarColor.BLACK.value)
-        self.scale_bar_color_combo.setToolTip(_("Scale bar color"))
+        set_tip(self.scale_bar_color_combo, HelpTopic.DISPLAY_SCALE_COLOR)
         self.scale_bar_color_combo.setEnabled(False)
         self.scale_bar_check.toggled.connect(self.scale_bar_color_combo.setEnabled)
         layout.addWidget(self.scale_bar_color_combo, row, 1)
@@ -82,6 +89,7 @@ class DisplayPanel(QGroupBox):
         self.advanced_toggle_btn.setCheckable(True)
         self.advanced_toggle_btn.setChecked(False)
         self.advanced_toggle_btn.setToolButtonStyle(Qt.ToolButtonTextOnly)
+        set_tip(self.advanced_toggle_btn, HelpTopic.DISPLAY_ADVANCED)
         self.advanced_toggle_btn.toggled.connect(self._on_advanced_toggled)
         layout.addWidget(self.advanced_toggle_btn, row, 0, 1, 2)
         row += 1
@@ -89,32 +97,25 @@ class DisplayPanel(QGroupBox):
         self.advanced_frame = QWidget()
         adv_layout = QGridLayout(self.advanced_frame)
         adv_layout.setContentsMargins(12, 4, 0, 0)
+        reserve_help_column(adv_layout, _HELP_COLUMN)
 
         self.override_check = QCheckBox(_("Override with physical calibration"))
         self.override_check.toggled.connect(self._on_override_toggled)
         adv_layout.addWidget(self.override_check, 0, 0, 1, 2)
+        add_help(adv_layout, 0, HelpTopic.DISPLAY_CALIBRATION, column=_HELP_COLUMN, tips=(self.override_check,))
 
         adv_layout.addWidget(QLabel("um/pixel:"), 1, 0)
         self.um_per_pixel_spin = QDoubleSpinBox()
         self.um_per_pixel_spin.setRange(0.0001, 10000)
         self.um_per_pixel_spin.setDecimals(4)
         self.um_per_pixel_spin.setValue(DEFAULT_UM_PER_PIXEL)
+        set_tip(self.um_per_pixel_spin, HelpTopic.DISPLAY_CALIBRATION)
         self.um_per_pixel_spin.setEnabled(False)
         self.um_per_pixel_spin.valueChanged.connect(self._emit_override)
         adv_layout.addWidget(self.um_per_pixel_spin, 1, 1)
 
-        override_hint = QLabel(
-            _(
-                "Only turn this on if you've measured a real um/pixel value "
-                "(e.g. by imaging a stage micrometer) and want the scale bar "
-                "in physical units instead of pixels."
-            )
-        )
-        override_hint.setWordWrap(True)
-        adv_layout.addWidget(override_hint, 2, 0, 1, 2)
-
         self.advanced_frame.setVisible(False)
-        layout.addWidget(self.advanced_frame, row, 0, 1, 2)
+        layout.addWidget(self.advanced_frame, row, 0, 1, _HELP_COLUMN + 1)  # reaches the help column, so its "?" lines up
 
     def _on_advanced_toggled(self, checked: bool) -> None:
         self.advanced_frame.setVisible(checked)

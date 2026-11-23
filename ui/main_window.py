@@ -24,6 +24,7 @@ from core.activity import Activity, ActivityTracker
 from core.app_info import LICENSE_SPDX
 from core.app_mode import AppMode
 from core.config import DEFAULT_OUTPUT_DIR
+from core.help_topics import HelpTopic
 from core.i18n import _, current_language
 from core.logging_setup import LogSession
 from core.overlays import draw_grid, draw_scale_bar, draw_status_badges
@@ -39,6 +40,7 @@ from .panels.log_panel import LogBar
 from .stage_module import StageModule
 from .startup import ModeDialog
 from .threads.camera_thread import ERR_LOST, ERR_NOT_DETECTED, CameraThread
+from .widgets.help import set_tip, tooltip_for
 from .widgets.scroll_column import ScrollColumn
 from .widgets.video_view import VideoView
 
@@ -115,7 +117,7 @@ class MainWindow(QMainWindow):
         main_layout.addWidget(self.controls_scroll, stretch=0)
 
         self.change_mode_btn = QPushButton(_("Change mode / language..."))
-        self._change_mode_tooltip = _("Return to the start screen to pick another mode or language")
+        self._change_mode_tooltip = tooltip_for(HelpTopic.CHANGE_MODE)
         self.change_mode_btn.setToolTip(self._change_mode_tooltip)
         self.change_mode_btn.clicked.connect(self._change_mode)
         controls_layout.addWidget(self.change_mode_btn)
@@ -174,7 +176,7 @@ class MainWindow(QMainWindow):
         self.status.addPermanentWidget(self.log_bar)
 
         self.about_btn = QPushButton(f"{_('About / License')} ({LICENSE_SPDX})")
-        self.about_btn.setToolTip(_("About this program and its license"))
+        set_tip(self.about_btn, HelpTopic.ABOUT)
         self.about_btn.clicked.connect(self._show_about)
         self.status.addPermanentWidget(self.about_btn)
 
@@ -299,7 +301,7 @@ class MainWindow(QMainWindow):
         self.camera_panel.set_locked(True)
         # Leaving the session would close the window (and the stage) mid-sweep.
         self.change_mode_btn.setEnabled(False)
-        self.change_mode_btn.setToolTip(_("Unavailable while auto-focus is running"))
+        self.change_mode_btn.setToolTip(tooltip_for(HelpTopic.LOCKED_DURING_AUTOFOCUS))
         self._activity_started(Activity.AUTOFOCUS)
 
     def _on_autofocus_ended(self, _succeeded: bool) -> None:
