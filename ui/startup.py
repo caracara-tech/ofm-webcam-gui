@@ -10,6 +10,7 @@ from __future__ import annotations
 
 from typing import Optional
 
+from PyQt5.QtCore import Qt
 from PyQt5.QtWidgets import QComboBox, QDialog, QHBoxLayout, QLabel, QPushButton, QVBoxLayout
 
 from core.app_mode import AppMode
@@ -24,6 +25,7 @@ class ModeDialog(QDialog):
 
     def __init__(self, default: AppMode = AppMode.AUTOMATED) -> None:
         super().__init__()
+        self.setWindowFlag(Qt.WindowContextHelpButtonHint, False)
         self.setMinimumWidth(460)
         self.selected: Optional[AppMode] = None
 
